@@ -89,7 +89,7 @@ backup_existing_config() {
 		if [[ $? -ne 0 ]]; then
 			error "Échec de la copie du fichier $HOME/.zshrc"
 		else
-        	info "Sauvegarde de ~/.zshrc vers $BACKUP_DIR"
+			info "Sauvegarde de ~/.zshrc vers $BACKUP_DIR"
 		fi
     fi
 
@@ -320,7 +320,7 @@ rollback() {
     exit 1
 }
 
-trap rollback ERR
+trap rollback ERR EXIT SIGINT SIGTERM
 
 # Lancement si exécuté directement
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then

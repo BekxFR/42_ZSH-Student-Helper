@@ -85,7 +85,7 @@ ZSH_AUTOSUGGEST_HIGHLIGHT_STYLE="fg=#663399,standout"
 
 source $ZSH/oh-my-zsh.sh
 
-DEFAULT_USER=chillion
+DEFAULT_USER=votre_nom
 
 # User configuration
 
@@ -120,6 +120,9 @@ DEFAULT_USER=chillion
 # LOGLEVEL: 0=silencieux, 1=erreurs, 2=warnings+erreurs, 3=info+warnings+erreurs, 4=debug (tout)
 export LOGLEVEL=${LOGLEVEL:-0}  # Valeur par défaut: mode silencieux
 export PROMPTLEVEL=${PROMPTLEVEL:-0}  # Valeur par défaut: prompt long
+export AUTO_INSTALL_BREW=${AUTO_INSTALL_BREW:-1}  # Valeur par défaut: installation automatique de Homebrew activée
+export ASYNC_SETUP=${ASYNC_SETUP:-1}  # Valeur par défaut: setup asynchrone activé
+export DISABLE_SETUP=${DISABLE_SETUP:-0}  # Valeur par défaut: setup automatique activé
 
 # Fonctions de logging
 logs_error() {
@@ -296,6 +299,7 @@ install_homebrew_if_needed() {
             # Lancement silencieux en arrière-plan avec gestion d'erreur améliorée
             {
                 if zsh -c "$installer_script" >/dev/null 2>&1; then
+                    export PATH="/tmp/tmp/homebrew/bin:$PATH"
                     logs_success "Homebrew installé avec succès!" >/dev/null 2>&1
                 else
                     logs_error "Échec de l'installation de Homebrew" >/dev/null 2>&1
@@ -333,10 +337,24 @@ setup_norminette_alias() {
     return 1
 }
 
-logs_debug "Initialisation des fonctions de setup..."
-if [[ "${DISABLE_SETUP:-0}" == "1" ]]; then
-    logs_debug "Setup automatique désactivé"
-elif [[ "${ASYNC_SETUP:-1}" == "1" ]]; then
+# Fonction principale de setup
+setup_42zsh_environment() {
+    logs_debug "Initialisation des fonctions de setup..."
+
+    if [[ "${DISABLE_SETUP:-0}" == "1" ]]; then
+        logs_debug "Setup automatique désactivé"
+        return 0
+    fi
+
+    if [[ "${ASYNC_SETUP:-1}" == "1" ]]; then
+        setup_async_mode
+    else
+        setup_sync_mode
+    fi
+}
+
+# Mode asynchrone (par défaut)
+setup_async_mode() {
     setopt NO_NOTIFY # Gestion des notifications de jobs
     { setup_temp_directories >/dev/null 2>&1; } &!
     { setup_environment >/dev/null 2>&1; } &!
@@ -346,7 +364,10 @@ elif [[ "${ASYNC_SETUP:-1}" == "1" ]]; then
     { setup_norminette_alias >/dev/null 2>&1; } &!
     setopt NOTIFY
     logs_debug "Fonctions de setup lancées en arrière-plan"
-else
+}
+
+# Mode synchrone (pour debug)
+setup_sync_mode() {
     setup_temp_directories
     setup_environment
     if [[ "${AUTO_INSTALL_BREW:-1}" == "1" ]]; then
@@ -354,7 +375,9 @@ else
     fi
     setup_norminette_alias
     logs_debug "Fonctions de setup exécutées de manière synchrone"
-fi
+}
+
+setup_42zsh_environment
 
 PyNormInstall() {
     local pip_path="$(command -v pip3 2>/dev/null)"
