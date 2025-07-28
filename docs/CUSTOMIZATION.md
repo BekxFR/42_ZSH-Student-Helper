@@ -33,9 +33,46 @@ emojis=("⚡️" "🔥" "👑" "😎" "🐸" "🐵" "🦄" "🌈" "🍻" "🚀" 
 
 ### Configuration utilisateur par défaut
 
+Le nom d'utilisateur par défaut peut être personnalisé de plusieurs façons :
+
+#### Méthode 1 : Automatique lors de l'installation
+
+Lors de l'exécution du script `Deploy.sh`, le système vous demande automatiquement votre nom d'utilisateur :
+
 ```bash
-export DEFAULT_USER="votre_nom"  # Masquer le nom d'utilisateur dans le prompt
+./Deploy.sh
+# Le script vous demandera : "Quel est votre nom d'utilisateur pour personnaliser le prompt ?"
 ```
+
+**Validation automatique :**
+
+- ✅ Pas de caractères spéciaux ou d'espaces
+- ✅ Maximum 20 caractères
+- ✅ Nom non vide
+
+#### Méthode 2 : Modification manuelle
+
+```bash
+# Dans ~/.zshrc, modifier la ligne :
+export DEFAULT_USER="votre_nom"  # Remplacer "votre_nom" par votre nom réel
+
+# Exemple :
+export DEFAULT_USER="alice"      # Le prompt affichera des emojis quand vous êtes "alice"
+```
+
+#### Méthode 3 : Via commande temporaire
+
+```bash
+# Pour une session temporaire uniquement
+export DEFAULT_USER="mon_nom"
+source ~/.zshrc
+```
+
+**💡 Impact de la configuration :**
+
+- Si votre nom d'utilisateur système correspond à `DEFAULT_USER`, le prompt affichera des **emojis aléatoires**
+- Sinon, le prompt affichera le nom d'utilisateur classique
+- Permet de masquer le nom d'utilisateur dans le prompt pour une interface plus épurée
 
 ### Segments du prompt
 

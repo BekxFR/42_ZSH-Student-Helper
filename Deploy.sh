@@ -32,13 +32,11 @@ info() {
 check_prerequisites() {
     info "Vérification des prérequis système..."
 
-    # Ubuntu/Debian requis
     if ! grep -E "ubuntu" /etc/os-release >/dev/null 2>&1; then
         error "Système non supporté. Ubuntu 20.04+ requis."
         exit 1
     fi
 
-    # Version Zsh
     if ! command -v zsh >/dev/null 2>&1; then
         error "Zsh n'est pas installé ou pas détecté correctement"
         exit 1
@@ -109,7 +107,6 @@ backup_existing_config() {
 deploy_config() {
     info "Déploiement de la configuration optimisée..."
 
-	# Creer des dossiers 42 et 42/42_ZSH_Scripts
 	if [[ ! -d "$HOME/42" ]]; then
 		mkdir -p "$HOME/42"
 		if [[ ! -d "$HOME/42" ]]; then
@@ -125,7 +122,6 @@ deploy_config() {
 		fi
 	fi
 
-    # Vérifier que le fichier .zshrc existe
     if [[ ! -f "$SCRIPT_DIR/data/.zshrc" ]]; then
         error "Fichier .zshrc introuvable dans $SCRIPT_DIR"
         exit 1
@@ -161,15 +157,54 @@ deploy_config() {
     success "Configuration déployée"
 }
 
+# Personnalisation du nom d'utilisateur
+customize_user_config() {
+    info "Personnalisation de la configuration utilisateur..."
+    
+    local user_name=""
+    while [[ -z "$user_name" ]]; do
+        echo -n "👤 Entrez votre nom d'utilisateur pour personnaliser le prompt (ex: votre_login_42): "
+        read -r user_name
+        
+        if [[ -z "$user_name" ]]; then
+            echo "⚠️  Le nom d'utilisateur ne peut pas être vide. Veuillez réessayer."
+        elif [[ "$user_name" =~ [[:space:]] ]]; then
+            echo "⚠️  Le nom d'utilisateur ne doit pas contenir d'espaces. Veuillez réessayer."
+            user_name=""
+        elif [[ ${#user_name} -gt 20 ]]; then
+            echo "⚠️  Le nom d'utilisateur est trop long (max 20 caractères). Veuillez réessayer."
+            user_name=""
+        fi
+    done
+    
+    if [[ ! -f "$HOME/.zshrc" ]]; then
+        error "Fichier .zshrc introuvable pour la personnalisation"
+        return 1
+    fi
+    
+    if sed -i "s/DEFAULT_USER=votre_nom/DEFAULT_USER=${user_name}/g" "$HOME/.zshrc"; then
+        success "Nom d'utilisateur personnalisé: $user_name"
+        info "Le prompt affichera des emojis aléatoires quand vous êtes connecté en tant que '$user_name'"
+    else
+        error "Échec de la personnalisation du nom d'utilisateur"
+        return 1
+    fi
+    
+    if grep -q "DEFAULT_USER=${user_name}" "$HOME/.zshrc"; then
+        success "Configuration personnalisée avec succès"
+    else
+        error "La personnalisation n'a pas été appliquée correctement"
+        return 1
+    fi
+}
+
 # Initialisation environnement
 init_environment() {
     info "Initialisation de l'environnement optimisé..."
 
-    # Vérification que les fichiers nécessaires sont en place
     cd "$HOME"
     export ZSH="$HOME/.oh-my-zsh"
     
-    # Vérifier que .zshrc a été correctement déployé
     if [[ -f "$HOME/.zshrc" ]]; then
         info "Configuration .zshrc déployée avec succès"
     else
@@ -188,7 +223,6 @@ init_environment() {
 verify_installation() {
     info "Vérification de l'installation..."
 
-    # Test commandes principales
     local test_commands=(
         "zsh --version"
         "brew --version 2>/dev/null || echo 'Homebrew sera installé au premier usage'"
@@ -216,17 +250,14 @@ install_powerline_fonts() {
         return 0
     fi
 
-    # Créer dossier temporaire
     local temp_dir="/tmp/powerline-fonts"
     rm -rf "$temp_dir" 2>/dev/null || true
 
-    # Cloner le dépôt des Fonts
     if ! git clone https://github.com/powerline/fonts.git --depth=1 "$temp_dir"; then
         error "Échec du clonage du dépôt des fonts Powerline"
         return 1
     fi
 
-    # Installer les Fonts
     cd "$temp_dir"
     if ! ./install.sh; then
         error "Échec de l'installation des Fonts Powerline"
@@ -235,7 +266,6 @@ install_powerline_fonts() {
         return 1
     fi
 
-    # Nettoyage
     cd - >/dev/null
     rm -rf "$temp_dir"
 
@@ -262,7 +292,6 @@ EOF
 
 # Fonction principale
 main() {
-    # Vérifier les arguments
     if [[ $# -gt 0 ]]; then
         case "$1" in
             "Fonts")
@@ -290,6 +319,7 @@ main() {
     install_ohmyzsh
     backup_existing_config
     deploy_config
+    customize_user_config
     init_environment
     verify_installation
 

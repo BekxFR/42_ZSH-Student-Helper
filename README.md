@@ -19,7 +19,7 @@ Ce projet fournit une configuration ZSH complète avec Oh-My-Zsh, le thème Agno
 - ✅ **Setup asynchrone** : Démarrage du shell plus rapide
 - ✅ **Gestion d'erreurs améliorée** : Plus de stabilité
 
-## �️ Fonctionnalités principales
+## 📑 Fonctionnalités principales
 
 ### 📋 Script Deploy.sh
 
@@ -64,7 +64,7 @@ Ce projet fournit une configuration ZSH complète avec Oh-My-Zsh, le thème Agno
 - `AUTO_INSTALL_BREW` : Installation automatique de Homebrew
 - `LOGLEVEL` / `PROMPTLEVEL` : Personnalisation de l'affichage
 
-## �🚀 Installation
+## 💾 Installation
 
 ### Installation automatique (Recommandée)
 
@@ -132,5 +132,5 @@ Projet sous licence MIT. Voir le fichier `LICENSE` pour plus de détails.
 
 ---
 
-**Créé avec ❤️ pour la communauté 42**
+**Créé avec ❤️ pour la communauté 42**  
 _Evoluer ensemble dans le partage_
