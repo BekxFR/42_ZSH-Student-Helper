@@ -134,3 +134,31 @@ setup_status    # Affiche l'état des variables de configuration
 log_status      # Affiche le niveau de log actuel
 prompt_level    # Affiche la configuration du prompt
 ```
+
+## 💬 Discord Portable
+
+### Installation et lancement automatique
+
+La fonction `discord` permet d'installer et lancer Discord automatiquement dans l'environnement temporaire `/tmp/tmp/discord`. Cette fonctionnalité est particulièrement utile dans un environnement contraint comme celui de l'école 42.
+
+**💡 Astuce :** Utilisation conseillée hors de `VSCode`
+
+📖 **[Guide complet Discord](DISCORD.md)** - Documentation détaillée avec troubleshooting
+
+#### Utilisation de base
+
+```bash
+discord          # Installation et lancement automatique
+discord_eval     # Version avec eval (alternative si problèmes)
+discord_pushd    # Version avec pushd/popd (gestion robuste)
+discord_debug    # Lance sans détection VS Code
+discord_test     # Test avec feedback complet
+```
+
+#### Fonctionnalités principales
+
+- ✅ **Installation automatique** : Télécharge Discord si absent
+- ✅ **Détection VS Code** : Flags de compatibilité automatiques
+- ✅ **Gestion répertoires** : Retour automatique au dossier d'origine
+- ✅ **Installation dans /tmp/tmp** : Économie d'espace utilisateur
+- ✅ **Multiple versions** : 3 implémentations pour compatibilité maximale

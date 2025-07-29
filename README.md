@@ -52,6 +52,7 @@ Ce projet fournit une configuration ZSH complète avec Oh-My-Zsh, le thème Agno
 - 🔌 **Plugins optimisés** : Syntax highlighting, autosuggestions, Git helpers
 - ⚡ **Aliases essentiels** : `bp`, `sa`, `x`, `Wcc` pour un workflow rapide
 - 🎛️ **Contrôles intelligents** : Gestion des logs, prompt, et setup via commandes simples
+- 🎧 **Discord portable** : Installation et lancement automatique de Discord (`discord`)
 
 **🔧 Outils de développement :**
 
@@ -99,6 +100,7 @@ x     # Clear terminal
 
 ```bash
 GF "message"   # Git add + commit + push
+discord        # Télécharger et lancer Discord automatiquement
 STmp           # Ouvrir dossier temporaire dans VS Code
 Wcc            # Compiler avec gcc -Wall -Wextra -Werror
 ```
@@ -118,6 +120,7 @@ Pour aller plus loin, consultez nos guides spécialisés :
 - **[Configuration avancée](docs/CONFIGURATION.md)** - Variables d'environnement, personnalisation
 - **[Optimisation](docs/OPTIMIZATION.md)** - Stratégies d'économie d'espace, architecture `/tmp/tmp`
 - **[Fonctionnalités](docs/FEATURES.md)** - Guide complet des fonctions et aliases
+- **[Discord Portable](docs/DISCORD.md)** - Installation et utilisation de Discord portable
 - **[Personnalisation](docs/CUSTOMIZATION.md)** - Thèmes, couleurs, fonctions personnalisées
 - **[Dépannage](docs/TROUBLESHOOTING.md)** - Solutions aux problèmes courants
 - **[Architecture](docs/ARCHITECTURE.md)** - Structure du code, développement

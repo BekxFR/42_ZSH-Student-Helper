@@ -580,3 +580,244 @@ GF() {
 		fi
 	fi
 }
+
+discord() {
+    local DISCORD_DIR="/tmp/tmp/discord"
+    local DOWNLOAD_URL="https://discord.com/api/download?platform=linux&format=tar.gz"
+    local VS_CODE_DETECTED=false
+    local BASE_FLAGS=("--no-sandbox" "--disable-dev-shm-usage")
+    local VSCODE_FLAGS=("--disable-gpu-sandbox" "--disable-features=VizDisplayCompositor")
+    local ALL_FLAGS=()
+    local ORIGINAL_DIR="$(pwd)"
+    
+    ALL_FLAGS+=("${BASE_FLAGS[@]}")
+
+    if [[ -n "$VSCODE_INJECTION" || "$TERM_PROGRAM" == "vscode" || -n "$VSCODE_PID" || 
+          "$TERMINAL_EMULATOR" == "vscode" || -n "$VSCODE_IPC_HOOK" ]]; then
+        VS_CODE_DETECTED=true
+        ALL_FLAGS+=("${VSCODE_FLAGS[@]}")
+        logs_warning "⚠️  VS Code détecté - Application de flags de compatibilité"
+        logs_info "💡 Des flags spéciaux seront utilisés pour éviter les conflits"
+        
+
+        echo -n "🤔 Continuer le lancement de Discord dans VS Code ? [y/N]: "
+        read -r response
+        case "$response" in
+            [yY][eE][sS]|[yY])
+                logs_info "🔧 Utilisation des flags de compatibilité VS Code"
+                ;;
+            *)
+                logs_info "⏸️  Lancement annulé. Conseil: utilisez un terminal externe pour Discord"
+                return 0
+                ;;
+        esac
+    fi
+
+    if [[ -x "$DISCORD_DIR/Discord/Discord" ]]; then
+        logs_info "🚀 Lancement de Discord..."
+        cd "$DISCORD_DIR"
+        nohup ./Discord/Discord "${ALL_FLAGS[@]}" >/dev/null 2>&1 &
+        logs_success "✅ Discord lancé en arrière-plan"
+        cd "$ORIGINAL_DIR"
+        return 0
+    fi
+
+    logs_info "📥 Téléchargement de Discord..."
+    mkdir -p "$DISCORD_DIR"
+    cd "$DISCORD_DIR"
+
+    if curl -L -o discord.tar.gz "$DOWNLOAD_URL" 2>/dev/null; then
+        logs_success "✅ Téléchargement réussi"
+        
+        logs_info "📦 Extraction..."
+        if tar -xzf discord.tar.gz 2>/dev/null; then
+            logs_success "✅ Extraction réussie"
+            
+            if [[ -d "Discord" && -x "Discord/Discord" ]]; then
+                logs_info "🚀 Lancement de Discord..."
+                nohup ./Discord/Discord "${ALL_FLAGS[@]}" >/dev/null 2>&1 &
+                logs_success "✅ Discord installé et lancé en arrière-plan"
+                cd "$ORIGINAL_DIR"
+                return 0
+            else
+                logs_error "❌ Erreur: L'exécutable Discord n'a pas été trouvé"
+                cd "$ORIGINAL_DIR"
+                return 1
+            fi
+        else
+            logs_error "❌ Échec de l'extraction"
+            cd "$ORIGINAL_DIR"
+            return 1
+        fi
+    else
+        logs_error "❌ Échec du téléchargement"
+        cd "$ORIGINAL_DIR"
+        return 1
+    fi
+}
+
+# Version avec eval pour Discord
+discord_eval() {
+    local DISCORD_DIR="/tmp/tmp/discord"
+    local DOWNLOAD_URL="https://discord.com/api/download?platform=linux&format=tar.gz"
+    local VS_CODE_DETECTED=false
+    local BASE_FLAGS=("--no-sandbox" "--disable-dev-shm-usage")
+    local VSCODE_FLAGS=("--disable-gpu-sandbox" "--disable-features=VizDisplayCompositor")
+    local ALL_FLAGS=()
+    local ORIGINAL_DIR="$(pwd)"
+    
+    ALL_FLAGS+=("${BASE_FLAGS[@]}")
+
+    if [[ -n "$VSCODE_INJECTION" || "$TERM_PROGRAM" == "vscode" || -n "$VSCODE_PID" || 
+          "$TERMINAL_EMULATOR" == "vscode" || -n "$VSCODE_IPC_HOOK" ]]; then
+        VS_CODE_DETECTED=true
+        ALL_FLAGS+=("${VSCODE_FLAGS[@]}")
+        logs_warning "⚠️  VS Code détecté - Application de flags de compatibilité"
+        logs_info "💡 Des flags spéciaux seront utilisés pour éviter les conflits"
+        
+
+        echo -n "🤔 Continuer le lancement de Discord dans VS Code ? [y/N]: "
+        read -r response
+        case "$response" in
+            [yY][eE][sS]|[yY])
+                logs_info "🔧 Utilisation des flags de compatibilité VS Code (version eval)"
+                ;;
+            *)
+                logs_info "⏸️  Lancement annulé. Conseil: utilisez un terminal externe pour Discord"
+                return 0
+                ;;
+        esac
+    fi
+
+    if [[ -x "$DISCORD_DIR/Discord/Discord" ]]; then
+        logs_info "🚀 Lancement de Discord (version eval)..."
+        cd "$DISCORD_DIR"
+        eval "nohup ./Discord/Discord "${ALL_FLAGS[@]}" >/dev/null 2>&1 &"
+        logs_success "✅ Discord lancé en arrière-plan"
+        cd "$ORIGINAL_DIR"
+        return 0
+    fi
+
+    logs_info "📥 Téléchargement de Discord..."
+    mkdir -p "$DISCORD_DIR"
+    cd "$DISCORD_DIR"
+
+    if curl -L -o discord.tar.gz "$DOWNLOAD_URL" 2>/dev/null; then
+        logs_success "✅ Téléchargement réussi"
+        
+        logs_info "📦 Extraction..."
+        if tar -xzf discord.tar.gz 2>/dev/null; then
+            logs_success "✅ Extraction réussie"
+            
+            if [[ -d "Discord" && -x "Discord/Discord" ]]; then
+                logs_info "🚀 Lancement de Discord (version eval)..."
+                eval "nohup ./Discord/Discord "${ALL_FLAGS[@]}" >/dev/null 2>&1 &"
+                logs_success "✅ Discord installé et lancé en arrière-plan"
+                cd "$ORIGINAL_DIR"
+                return 0
+            else
+                logs_error "❌ Erreur: L'exécutable Discord n'a pas été trouvé"
+                cd "$ORIGINAL_DIR"
+                return 1
+            fi
+        else
+            logs_error "❌ Échec de l'extraction"
+            cd "$ORIGINAL_DIR"
+            return 1
+        fi
+    else
+        logs_error "❌ Échec du téléchargement"
+        cd "$ORIGINAL_DIR"
+        return 1
+    fi
+}
+
+# Version avec pushd/popd pour une gestion plus robuste des répertoires
+discord_pushd() {
+    local DISCORD_DIR="/tmp/tmp/discord"
+    local DOWNLOAD_URL="https://discord.com/api/download?platform=linux&format=tar.gz"
+    local VS_CODE_DETECTED=false
+    local BASE_FLAGS=("--no-sandbox" "--disable-dev-shm-usage")
+    local VSCODE_FLAGS=("--disable-gpu-sandbox" "--disable-features=VizDisplayCompositor")
+    local ALL_FLAGS=()
+    
+    ALL_FLAGS+=("${BASE_FLAGS[@]}")
+
+    if [[ -n "$VSCODE_INJECTION" || "$TERM_PROGRAM" == "vscode" || -n "$VSCODE_PID" || 
+          "$TERMINAL_EMULATOR" == "vscode" || -n "$VSCODE_IPC_HOOK" ]]; then
+        VS_CODE_DETECTED=true
+        ALL_FLAGS+=("${VSCODE_FLAGS[@]}")
+        logs_warning "⚠️  VS Code détecté - Application de flags de compatibilité"
+        logs_info "💡 Version pushd/popd utilisée pour la gestion des répertoires"
+        
+        echo -n "🤔 Continuer le lancement de Discord dans VS Code ? [y/N]: "
+        read -r response
+        case "$response" in
+            [yY][eE][sS]|[yY])
+                logs_info "🔧 Utilisation des flags de compatibilité VS Code (version pushd)"
+                ;;
+            *)
+                logs_info "⏸️  Lancement annulé"
+                return 0
+                ;;
+        esac
+    fi
+
+    # Sauvegarder le répertoire avec pushd
+    pushd "$DISCORD_DIR" >/dev/null 2>&1 || {
+        mkdir -p "$DISCORD_DIR"
+        pushd "$DISCORD_DIR" >/dev/null 2>&1
+    }
+
+    if [[ -x "Discord/Discord" ]]; then
+        logs_info "🚀 Lancement de Discord (version pushd)..."
+        nohup ./Discord/Discord "${ALL_FLAGS[@]}" >/dev/null 2>&1 &
+        logs_success "✅ Discord lancé en arrière-plan"
+        popd >/dev/null 2>&1
+        return 0
+    fi
+
+    logs_info "📥 Téléchargement de Discord..."
+    
+    if curl -L -o discord.tar.gz "$DOWNLOAD_URL" 2>/dev/null; then
+        logs_success "✅ Téléchargement réussi"
+        
+        logs_info "📦 Extraction..."
+        if tar -xzf discord.tar.gz 2>/dev/null; then
+            logs_success "✅ Extraction réussie"
+            
+            if [[ -d "Discord" && -x "Discord/Discord" ]]; then
+                logs_info "🚀 Lancement de Discord..."
+                nohup ./Discord/Discord "${ALL_FLAGS[@]}" >/dev/null 2>&1 &
+                logs_success "✅ Discord installé et lancé en arrière-plan"
+                popd >/dev/null 2>&1
+                return 0
+            else
+                logs_error "❌ Erreur: L'exécutable Discord n'a pas été trouvé"
+                popd >/dev/null 2>&1
+                return 1
+            fi
+        else
+            logs_error "❌ Échec de l'extraction"
+            popd >/dev/null 2>&1
+            return 1
+        fi
+    else
+        logs_error "❌ Échec du téléchargement"
+        popd >/dev/null 2>&1
+        return 1
+    fi
+}
+
+# Alias de debug pour Discord avec retour au répertoire d'origine
+alias discord_debug='VSCODE_PID="" discord'
+alias discord_force='ORIGINAL_PWD="$(pwd)" && cd /tmp/tmp/discord && ./Discord/Discord --no-sandbox --disable-dev-shm-usage 2>&1; cd "$ORIGINAL_PWD"'
+alias discord_minimal='ORIGINAL_PWD="$(pwd)" && cd /tmp/tmp/discord && ./Discord/Discord 2>&1; cd "$ORIGINAL_PWD"'
+
+# Fonction utilitaire pour tester Discord depuis n'importe quel répertoire
+discord_test() {
+    echo "🧪 Test de lancement Discord depuis: $(pwd)"
+    echo "📂 Installation/lancement dans: /tmp/tmp/discord"
+    discord
+    echo "📁 Vous êtes maintenant dans: $(pwd)"
+}
