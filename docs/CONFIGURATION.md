@@ -41,7 +41,7 @@ Ces variables ont été ajoutées pour améliorer la cohérence :
 ```bash
 # Contrôle setup automatique
 export DISABLE_SETUP=${DISABLE_SETUP:-0}     # Valeur par défaut: setup automatique activé
-export ASYNC_SETUP=${ASYNC_SETUP:-1}         # Valeur par défaut: setup asynchrone activé
+export ASYNC_SETUP=${ASYNC_SETUP:-0}         # Valeur par défaut: setup synchrone pour première installation
 export AUTO_INSTALL_BREW=${AUTO_INSTALL_BREW:-1}  # Valeur par défaut: installation automatique de Homebrew activée
 
 # Contrôle prompt
@@ -74,7 +74,7 @@ alias setup_off='export DISABLE_SETUP=1 && echo "🚫 Setup automatique désacti
 alias setup_on='export DISABLE_SETUP=0 && echo "✅ Setup automatique activé"'
 alias brew_auto_install_off='export AUTO_INSTALL_BREW=0 && echo "🚫 Installation automatique de Homebrew désactivée"'
 alias brew_auto_install_on='export AUTO_INSTALL_BREW=1 && echo "✅ Installation automatique de Homebrew activée"'
-alias setup_status='echo "📊 ASYNC_SETUP: ${ASYNC_SETUP:-1}, AUTO_INSTALL_BREW: ${AUTO_INSTALL_BREW:-1}, DISABLE_SETUP: ${DISABLE_SETUP:-0}"'
+alias setup_status='echo "📊 ASYNC_SETUP: ${ASYNC_SETUP:-0}, AUTO_INSTALL_BREW: ${AUTO_INSTALL_BREW:-1}, DISABLE_SETUP: ${DISABLE_SETUP:-0}"'
 ```
 
 ## Configuration PATH optimisée

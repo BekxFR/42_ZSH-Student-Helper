@@ -147,7 +147,7 @@ logs_debug() {
 
 # Aliases simples
 alias bp='vim ~/.zshrc'
-alias sa='source ~/.zshrc && log_success "ZSH aliases rechargés."'
+alias sa='source ~/.zshrc && logs_success "ZSH aliases rechargés."'
 alias GoC='rm -f ~/.config/google-chrome/SingletonLock 2>/dev/null || true'
 alias BrC='rm -f ~/.config/BraveSoftware/Brave-Browser/SingletonLock 2>/dev/null || true'
 alias x='printf "\033c"'
@@ -360,7 +360,7 @@ setup_42zsh_environment() {
     else
         setup_sync_mode
         if [[ $force_sync == "1" ]]; then
-            setup_async
+            export ASYNC_SETUP=1
             logs_info "Setup initial terminé. Mode async activé. Vous pouvez gérer le mode a/synchrone avec 'setup_async' ou 'setup_sync'"
         fi
     fi
