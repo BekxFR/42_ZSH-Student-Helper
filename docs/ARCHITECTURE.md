@@ -49,8 +49,14 @@ rollback() {
     error "Rollback terminé. Consultez $LOG_FILE pour détails."
     exit 1
 }
-trap cleanup ERR EXIT SIGINT SIGTERM
+# Trap uniquement sur erreurs et interruptions (pas sur sortie normale)
+trap rollback ERR SIGINT SIGTERM
 ```
+
+**Signaux gérés par le trap :**
+- `ERR` : Erreur bash (commande retournant un code non-zéro avec `set -e`)
+- `SIGINT` : Interruption clavier (Ctrl+C)
+- `SIGTERM` : Signal de terminaison propre du système
 
 ## Architecture des fonctions
 

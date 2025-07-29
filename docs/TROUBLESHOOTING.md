@@ -133,6 +133,15 @@ rlwrap --version  # Déclenche l'installation automatique si brew disponible
 brew install rlwrap
 ```
 
+### Rollback inattendu lors de l'installation
+
+**Explication des signaux** :
+- `ERR` : Erreur bash (commande échouée avec `set -e`)
+- `SIGINT` : Interruption clavier (Ctrl+C)
+- `SIGTERM` : Signal de terminaison système
+- ~~`EXIT`~~ : Se déclenche à chaque sortie, même réussie
+
+
 ## Reset complet
 
 ### Sauvegarde et reset

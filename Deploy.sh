@@ -379,7 +379,7 @@ rollback() {
     exit 1
 }
 
-trap rollback ERR EXIT SIGINT SIGTERM
+trap rollback ERR SIGINT SIGTERM
 
 # Lancement si exécuté directement
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
