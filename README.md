@@ -14,10 +14,12 @@ Ce projet fournit une configuration ZSH complète avec Oh-My-Zsh, le thème Agno
 
 ### ⚡ Améliorations récentes
 
-- ✅ **PATH Homebrew corrigé** : Accès automatique aux commandes `brew`
+- ✅ **Installation plugins externes** : `zsh-autosuggestions` et `zsh-syntax-highlighting` installés automatiquement
+- ✅ **Setup synchrone intelligent** : Mode synchrone par défaut pour première installation garantissant la prise en compte des variables d'environnement
+- ✅ **PATH Homebrew corrigé** : Accès automatique aux commandes `brew` dès l'installation
 - ✅ **Variables d'environnement complètes** : Configuration robuste et cohérente
-- ✅ **Setup asynchrone** : Démarrage du shell plus rapide
-- ✅ **Gestion d'erreurs améliorée** : Plus de stabilité
+- ✅ **Setup asynchrone adaptatif** : Démarrage du shell plus rapide après configuration initiale
+- ✅ **Gestion d'erreurs améliorée** : Plus de stabilité et détection automatique première installation
 
 ## 📑 Fonctionnalités principales
 
@@ -26,6 +28,7 @@ Ce projet fournit une configuration ZSH complète avec Oh-My-Zsh, le thème Agno
 **Déploiement automatisé et intelligent :**
 
 - 🔧 **Installation Oh-My-Zsh** : Configuration automatique du framework ZSH
+- 🔌 **Plugins externes** : Installation automatique de `zsh-autosuggestions` et `zsh-syntax-highlighting`
 - 🎨 **Fonts Powerline** : Installation des polices nécessaires au thème Agnoster
 - 💾 **Sauvegarde automatique** : Backup de la configuration existante avant modification
 - ✅ **Vérification prérequis** : Contrôle de l'environnement (Zsh version, espace disque)
@@ -60,7 +63,7 @@ Ce projet fournit une configuration ZSH complète avec Oh-My-Zsh, le thème Agno
 **⚙️ Variables d'environnement :**
 
 - `DISABLE_SETUP` : Contrôle du setup automatique
-- `ASYNC_SETUP` : Mode asynchrone pour des performances optimales
+- `ASYNC_SETUP` : Mode asynchrone (défaut: 0=synchrone pour première installation)
 - `AUTO_INSTALL_BREW` : Installation automatique de Homebrew
 - `LOGLEVEL` / `PROMPTLEVEL` : Personnalisation de l'affichage
 

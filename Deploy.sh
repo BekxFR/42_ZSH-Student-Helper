@@ -69,6 +69,35 @@ install_ohmyzsh() {
     else
         info "Oh-My-Zsh déjà installé"
     fi
+    
+    # Installation des plugins externes requis
+    local plugin_dir="${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}/plugins"
+    
+    # Plugin zsh-autosuggestions
+    if [[ ! -d "$plugin_dir/zsh-autosuggestions" ]]; then
+        info "Installation du plugin zsh-autosuggestions..."
+        if git clone https://github.com/zsh-users/zsh-autosuggestions "$plugin_dir/zsh-autosuggestions"; then
+            success "Plugin zsh-autosuggestions installé"
+        else
+            error "Échec de l'installation du plugin zsh-autosuggestions"
+            return 1
+        fi
+    else
+        info "Plugin zsh-autosuggestions déjà installé"
+    fi
+    
+    # Plugin zsh-syntax-highlighting
+    if [[ ! -d "$plugin_dir/zsh-syntax-highlighting" ]]; then
+        info "Installation du plugin zsh-syntax-highlighting..."
+        if git clone https://github.com/zsh-users/zsh-syntax-highlighting.git "$plugin_dir/zsh-syntax-highlighting"; then
+            success "Plugin zsh-syntax-highlighting installé"
+        else
+            error "Échec de l'installation du plugin zsh-syntax-highlighting"
+            return 1
+        fi
+    else
+        info "Plugin zsh-syntax-highlighting déjà installé"
+    fi
 }
 
 # Sauvegarde configuration existante

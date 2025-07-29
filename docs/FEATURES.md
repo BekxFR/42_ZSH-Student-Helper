@@ -1,5 +1,29 @@
 # 🛠️ Fonctionnalités détaillées
 
+## Installation automatique Oh-My-Zsh et plugins
+
+Le script `Deploy.sh` gère l'installation complète d'Oh-My-Zsh et des plugins externes nécessaires :
+
+```bash
+# Installation Oh-My-Zsh
+if [[ ! -d "$HOME/.oh-my-zsh" ]]; then
+    RUNZSH=no sh -c "$(curl -fsSL https://raw.github.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
+fi
+
+# Installation plugins externes requis
+local plugin_dir="${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}/plugins"
+
+# Plugin zsh-autosuggestions (suggestions basées sur l'historique)
+if [[ ! -d "$plugin_dir/zsh-autosuggestions" ]]; then
+    git clone https://github.com/zsh-users/zsh-autosuggestions "$plugin_dir/zsh-autosuggestions"
+fi
+
+# Plugin zsh-syntax-highlighting (coloration syntaxique temps réel)
+if [[ ! -d "$plugin_dir/zsh-syntax-highlighting" ]]; then
+    git clone https://github.com/zsh-users/zsh-syntax-highlighting.git "$plugin_dir/zsh-syntax-highlighting"
+fi
+```
+
 ## Installation automatique Homebrew
 
 Le script `BrewInstaller.sh` gère l'installation complète :

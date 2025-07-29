@@ -121,7 +121,7 @@ DEFAULT_USER=votre_nom
 export LOGLEVEL=${LOGLEVEL:-0}  # Valeur par défaut: mode silencieux
 export PROMPTLEVEL=${PROMPTLEVEL:-0}  # Valeur par défaut: prompt long
 export AUTO_INSTALL_BREW=${AUTO_INSTALL_BREW:-1}  # Valeur par défaut: installation automatique de Homebrew activée
-export ASYNC_SETUP=${ASYNC_SETUP:-1}  # Valeur par défaut: setup asynchrone activé
+export ASYNC_SETUP=${ASYNC_SETUP:-0}  # Valeur par défaut: setup synchrone pour première installation
 export DISABLE_SETUP=${DISABLE_SETUP:-0}  # Valeur par défaut: setup automatique activé
 
 # Fonctions de logging
@@ -169,12 +169,12 @@ alias prompt_level='echo "📊 Niveau du prompt actuel: $PROMPTLEVEL (1 = short,
 
 # Contrôle du setup
 alias setup_sync='export ASYNC_SETUP=0 && echo "🔄 Setup synchrone activé"'
-alias setup_async='export ASYNC_SETUP=1 && echo "⚡ Setup asynchrone activé"'
+alias setup_async='export ASYNC_SETUP=1 && echo "⚡ Setup asynchrone activé (recommandé après la première installation)"'
 alias setup_off='export DISABLE_SETUP=1 && echo "🚫 Setup automatique désactivé"'
 alias setup_on='export DISABLE_SETUP=0 && echo "✅ Setup automatique activé"'
 alias brew_auto_install_off='export AUTO_INSTALL_BREW=0 && echo "🚫 Installation automatique de Homebrew désactivée"'
 alias brew_auto_install_on='export AUTO_INSTALL_BREW=1 && echo "✅ Installation automatique de Homebrew activée"'
-alias setup_status='echo "📊 ASYNC_SETUP: ${ASYNC_SETUP:-1}, AUTO_INSTALL_BREW: ${AUTO_INSTALL_BREW:-1}, DISABLE_SETUP: ${DISABLE_SETUP:-0}"'
+alias setup_status='echo "📊 ASYNC_SETUP: ${ASYNC_SETUP:-0}, AUTO_INSTALL_BREW: ${AUTO_INSTALL_BREW:-1}, DISABLE_SETUP: ${DISABLE_SETUP:-0}"'
 
 if [[ -f "$HOME/42/42_ZSH_Scripts/BrewInstaller.sh" ]]; then
     alias IBrew="$HOME/42/42_ZSH_Scripts/BrewInstaller.sh"
@@ -346,24 +346,41 @@ setup_42zsh_environment() {
         return 0
     fi
 
-    if [[ "${ASYNC_SETUP:-1}" == "1" ]]; then
+    local force_sync=0
+    
+    if [[ ! -d "/tmp/tmp" ]] || \
+       [[ "${AUTO_INSTALL_BREW:-1}" == "1" && ! -x "/tmp/tmp/homebrew/bin/brew" ]] || \
+       [[ "$PATH" != *"/tmp/tmp/homebrew/bin"* ]]; then
+        force_sync=1
+        logs_debug "Première installation détectée - mode synchrone forcé"
+    fi
+
+    if [[ "${ASYNC_SETUP:-0}" == "1" && $force_sync == "0" ]]; then
         setup_async_mode
     else
         setup_sync_mode
+        if [[ $force_sync == "1" ]]; then
+            setup_async
+            logs_info "Setup initial terminé. Mode async activé. Vous pouvez gérer le mode a/synchrone avec 'setup_async' ou 'setup_sync'"
+        fi
     fi
 }
 
-# Mode asynchrone (par défaut)
+# Mode asynchrone (pour environnements déjà configurés)
 setup_async_mode() {
+    logs_debug "Mode asynchrone - environnement déjà configuré"
+    
+    setup_temp_directories
+    setup_environment
+    
     setopt NO_NOTIFY # Gestion des notifications de jobs
-    { setup_temp_directories >/dev/null 2>&1; } &!
-    { setup_environment >/dev/null 2>&1; } &!
     if [[ "${AUTO_INSTALL_BREW:-1}" == "1" ]]; then
         { install_homebrew_if_needed >/dev/null 2>&1; } &!
     fi
     { setup_norminette_alias >/dev/null 2>&1; } &!
     setopt NOTIFY
-    logs_debug "Fonctions de setup lancées en arrière-plan"
+    
+    logs_debug "Environnement configuré, installations lancées en arrière-plan"
 }
 
 # Mode synchrone (pour debug)

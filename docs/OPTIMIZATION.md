@@ -42,9 +42,9 @@ export PYTHONUSERBASE="/tmp/tmp"
 export PATH="/tmp/tmp/bin:$PATH"
 ```
 
-## Setup environnement modulaire
+## Setup environnement intelligent et adaptatif
 
-Le système utilise des fonctions modulaires pour la configuration :
+Le système utilise des fonctions modulaires pour la configuration avec détection automatique du mode d'installation :
 
 ```bash
 setup_temp_directories()      # Création structure /tmp/tmp
@@ -53,25 +53,50 @@ install_homebrew_if_needed()  # Installation conditionnelle Homebrew
 setup_norminette_alias()      # Configuration outils Python
 ```
 
-### Fonctionnement asynchrone ou synchrone
+### Mode synchrone par défaut pour première installation
 
-Par défaut, le setup s'exécute en arrière-plan pour ne pas ralentir le démarrage du shell :
+Le système détecte automatiquement s'il s'agit d'une première installation et force le mode synchrone pour garantir la prise en compte des variables d'environnement :
 
 ```bash
-# Mode asynchrone (par défaut)
+# Détection automatique première installation
+local force_sync=0
+if [[ ! -d "/tmp/tmp" ]] || \
+   [[ "${AUTO_INSTALL_BREW:-1}" == "1" && ! -x "/tmp/tmp/homebrew/bin/brew" ]] || \
+   [[ "$PATH" != *"/tmp/tmp/homebrew/bin"* ]]; then
+    force_sync=1
+    logs_debug "Première installation détectée - mode synchrone forcé"
+fi
+```
+
+### Mode asynchrone adaptatif
+
+Après la première installation, le mode asynchrone peut être activé pour optimiser les performances :
+
+```bash
+# Mode asynchrone (pour environnements déjà configurés)
 setup_async_mode() {
-    setopt NO_NOTIFY # Gestion des notifications de jobs
-    { setup_temp_directories >/dev/null 2>&1; } &!
-    { setup_environment >/dev/null 2>&1; } &!
+    logs_debug "Mode asynchrone - environnement déjà configuré"
+    
+    # Ces fonctions doivent TOUJOURS être synchrones car elles modifient l'environnement
+    setup_temp_directories
+    setup_environment
+    
+    # Seules les installations peuvent être asynchrones
+    setopt NO_NOTIFY
     if [[ "${AUTO_INSTALL_BREW:-1}" == "1" ]]; then
         { install_homebrew_if_needed >/dev/null 2>&1; } &!
     fi
     { setup_norminette_alias >/dev/null 2>&1; } &!
     setopt NOTIFY
-    logs_debug "Fonctions de setup lancées en arrière-plan"
 }
+```
 
-# Mode synchrone (pour debug)
+### Fonctionnement synchrone garanti
+
+Le mode synchrone garantit que toutes les modifications d'environnement sont prises en compte immédiatement :
+
+```bash
+# Mode synchrone (première installation ou debug)
 setup_sync_mode() {
     setup_temp_directories
     setup_environment
@@ -85,17 +110,21 @@ setup_sync_mode() {
 
 ## Plugins Oh-My-Zsh optimisés
 
-Configuration plugins pour productivité maximale :
+Configuration plugins pour productivité maximale avec installation automatique des plugins externes :
 
 ```bash
 plugins=(
-    git                      # Aliases Git avancés
-    zsh-syntax-highlighting  # Coloration syntaxe en temps réel
-    zsh-autosuggestions      # Suggestions basées historique
-    web-search               # Recherche web depuis terminal
-    copybuffer               # Copie buffer vers clipboard
-    dirhistory               # Navigation historique dossiers
-    copyfile                 # Copie contenu fichier
-    history                  # Gestion historique avancée
+    git                      # Aliases Git avancés (inclus par défaut)
+    zsh-syntax-highlighting  # Coloration syntaxe en temps réel (externe - installé auto)
+    zsh-autosuggestions      # Suggestions basées historique (externe - installé auto)
+    web-search               # Recherche web depuis terminal (inclus par défaut)
+    copybuffer               # Copie buffer vers clipboard (inclus par défaut)
+    dirhistory               # Navigation historique dossiers (inclus par défaut)
+    copyfile                 # Copie contenu fichier (inclus par défaut)
+    history                  # Gestion historique avancée (inclus par défaut)
 )
 ```
+
+**Plugins externes installés automatiquement :**
+- `zsh-autosuggestions` : Suggestions intelligentes basées sur l'historique des commandes
+- `zsh-syntax-highlighting` : Coloration syntaxique en temps réel pour une meilleure lisibilité
