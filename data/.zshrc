@@ -124,6 +124,10 @@ export AUTO_INSTALL_BREW=${AUTO_INSTALL_BREW:-1}  # Valeur par défaut: installa
 export ASYNC_SETUP=${ASYNC_SETUP:-0}  # Valeur par défaut: setup synchrone pour première installation
 export DISABLE_SETUP=${DISABLE_SETUP:-0}  # Valeur par défaut: setup automatique activé
 
+# Configuration Node.js et npm dans /tmp/tmp (sans sudo)
+export N_PREFIX="/tmp/tmp/node"
+export PATH="/tmp/tmp/node/bin:/tmp/tmp/npm-global/bin:$PATH"
+
 # Fonctions de logging
 logs_error() {
     [[ $LOGLEVEL -ge 1 ]] && echo "❌ $*" >&2
@@ -821,3 +825,125 @@ discord_test() {
     discord
     echo "📁 Vous êtes maintenant dans: $(pwd)"
 }
+
+# Installation automatique de Node.js et npm dans /tmp/tmp (sans sudo)
+# Usage: NodeInstall [version] - par défaut installe la dernière version
+NodeInstall() {
+    local node_version="${1:-latest}"
+    local npm_global_dir="/tmp/tmp/npm-global"
+    local node_dir="/tmp/tmp/node"
+    local original_dir="$(pwd)"
+    
+    echo "🚀 Installation de Node.js et npm dans /tmp/tmp..."
+    echo "📌 Version demandée: $node_version"
+    
+    # Création des répertoires nécessaires
+    echo "📁 Création des répertoires..."
+    if ! mkdir -p "$npm_global_dir" "$node_dir" 2>/dev/null; then
+        echo "❌ Erreur: Impossible de créer les répertoires nécessaires" >&2
+        return 1
+    fi
+    
+    # Configuration des variables d'environnement
+    echo "🔧 Configuration des variables d'environnement..."
+    export N_PREFIX="$node_dir"
+    export PATH="$node_dir/bin:$npm_global_dir/bin:$PATH"
+    
+    # Vérification de npm actuel pour installer 'n'
+    echo "🔍 Vérification de npm..."
+    if ! command -v npm >/dev/null 2>&1; then
+        echo "❌ Erreur: npm n'est pas disponible pour installer 'n'" >&2
+        echo "💡 Suggestion: Installez d'abord Node.js système ou utilisez un autre gestionnaire" >&2
+        return 1
+    fi
+    
+    # Configuration du préfixe npm pour les installations globales
+    echo "⚙️  Configuration du préfixe npm..."
+    npm config set prefix "$npm_global_dir" 2>/dev/null || {
+        echo "⚠️  Avertissement: Impossible de configurer le préfixe npm" >&2
+    }
+    
+    # Installation de 'n' si nécessaire
+    if ! command -v n >/dev/null 2>&1; then
+        echo "📦 Installation du gestionnaire de versions Node.js 'n'..."
+        if ! npm install -g n 2>/dev/null; then
+            echo "❌ Erreur: Échec de l'installation de 'n'" >&2
+            return 1
+        fi
+        
+        # Mise à jour du PATH pour 'n'
+        export PATH="$npm_global_dir/bin:$PATH"
+        hash -r
+        
+        if ! command -v n >/dev/null 2>&1; then
+            echo "❌ Erreur: 'n' n'est toujours pas disponible après installation" >&2
+            return 1
+        fi
+        echo "✅ 'n' installé avec succès"
+    else
+        echo "✅ 'n' est déjà disponible"
+    fi
+    
+    # Installation de Node.js avec 'n'
+    echo "🔄 Installation de Node.js $node_version..."
+    if ! n "$node_version" 2>/dev/null; then
+        echo "❌ Erreur: Échec de l'installation de Node.js $node_version" >&2
+        return 1
+    fi
+    
+    # Mise à jour du cache des commandes
+    echo "🔄 Mise à jour du cache des commandes..."
+    hash -r
+    
+    # Vérification de l'installation
+    echo "🧪 Vérification de l'installation..."
+    local node_path="$node_dir/bin/node"
+    local npm_path="$node_dir/bin/npm"
+    
+    if [[ -x "$node_path" && -x "$npm_path" ]]; then
+        local node_ver=$("$node_path" --version 2>/dev/null)
+        local npm_ver=$("$npm_path" --version 2>/dev/null)
+        
+        echo "✅ Installation réussie!"
+        echo "📋 Résumé:"
+        echo "   • Node.js: $node_ver (installé dans $node_dir)"
+        echo "   • npm: $npm_ver"
+        echo "   • Préfixe npm global: $npm_global_dir"
+        
+        # Mise à jour de la configuration dans .zshrc si nécessaire
+        local zshrc_path="/tmp/tmp/42_ZSH-Student-Helper/data/.zshrc"
+        if [[ -f "$zshrc_path" ]]; then
+            if ! grep -q "export N_PREFIX=\"/tmp/tmp/node\"" "$zshrc_path" 2>/dev/null; then
+                echo ""
+                echo "💡 Pour rendre cette configuration permanente, ajoutez ces lignes à votre .zshrc :"
+                echo "   export N_PREFIX=\"/tmp/tmp/node\""
+                echo "   export PATH=\"/tmp/tmp/node/bin:/tmp/tmp/npm-global/bin:\$PATH\""
+            else
+                echo "✅ Configuration déjà présente dans le .zshrc"
+            fi
+        fi
+        
+        echo ""
+        echo "🎉 Node.js et npm sont maintenant disponibles sans privilèges sudo!"
+        echo "💡 Commandes utiles:"
+        echo "   • node --version    # Vérifier la version de Node.js"
+        echo "   • npm --version     # Vérifier la version de npm"
+        echo "   • n latest          # Mettre à jour vers la dernière version"
+        echo "   • n <version>       # Installer une version spécifique"
+        echo "   • n ls              # Lister les versions installées"
+        
+    else
+        echo "❌ Erreur: L'installation semble avoir échoué" >&2
+        echo "🔍 Diagnostic:"
+        echo "   • Node.js path: $node_path (existe: $(test -f "$node_path" && echo "oui" || echo "non"))"
+        echo "   • npm path: $npm_path (existe: $(test -f "$npm_path" && echo "oui" || echo "non"))"
+        return 1
+    fi
+    
+    return 0
+}
+
+# Alias pour installation rapide
+alias node_install='NodeInstall'
+alias install_node='NodeInstall'
+alias setup_node='NodeInstall'

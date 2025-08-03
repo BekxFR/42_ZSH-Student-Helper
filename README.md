@@ -57,7 +57,8 @@ Ce projet fournit une configuration ZSH complète avec Oh-My-Zsh, le thème Agno
 **🔧 Outils de développement :**
 
 - 📏 **Norminette Python** : Configuration automatique de flake8 (`PyNormInstall`)
-- 🔄 **rlwrap intelligent** : Installation et utilisation automatique via Homebrew
+- � **Node.js portable** : Installation automatique de Node.js et npm sans sudo (`NodeInstall`)
+- �🔄 **rlwrap intelligent** : Installation et utilisation automatique via Homebrew
 - 📤 **Git workflow** : Fonction `GF` pour add/commit/push en une commande
 - 🧹 **Nettoyage navigateurs** : Déblocage Chrome/Brave (`GoC`, `BrC`)
 
@@ -100,6 +101,7 @@ x     # Clear terminal
 
 ```bash
 GF "message"   # Git add + commit + push
+NodeInstall    # Installer Node.js et npm sans sudo
 discord        # Télécharger et lancer Discord automatiquement
 STmp           # Ouvrir dossier temporaire dans VS Code
 Wcc            # Compiler avec gcc -Wall -Wextra -Werror
@@ -120,6 +122,7 @@ Pour aller plus loin, consultez nos guides spécialisés :
 - **[Configuration avancée](docs/CONFIGURATION.md)** - Variables d'environnement, personnalisation
 - **[Optimisation](docs/OPTIMIZATION.md)** - Stratégies d'économie d'espace, architecture `/tmp/tmp`
 - **[Fonctionnalités](docs/FEATURES.md)** - Guide complet des fonctions et aliases
+- **[Node.js et npm](docs/NODEJS.md)** - Installation et gestion Node.js sans sudo
 - **[Discord Portable](docs/DISCORD.md)** - Installation et utilisation de Discord portable
 - **[Personnalisation](docs/CUSTOMIZATION.md)** - Thèmes, couleurs, fonctions personnalisées
 - **[Dépannage](docs/TROUBLESHOOTING.md)** - Solutions aux problèmes courants

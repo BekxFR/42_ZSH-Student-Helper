@@ -162,3 +162,81 @@ discord_test     # Test avec feedback complet
 - ✅ **Gestion répertoires** : Retour automatique au dossier d'origine
 - ✅ **Installation dans /tmp/tmp** : Économie d'espace utilisateur
 - ✅ **Multiple versions** : 3 implémentations pour compatibilité maximale
+
+## 🚀 Node.js et npm - Installation sans sudo
+
+### Installation automatique Node.js et npm
+
+La fonction `NodeInstall` permet d'installer automatiquement Node.js et npm dans l'environnement temporaire `/tmp/tmp` sans nécessiter de privilèges sudo. Cette fonctionnalité utilise le gestionnaire de versions `n` pour une installation flexible et optimisée.
+
+**💡 Avantage :** Installation complète sans droits administrateur, idéale pour l'environnement 42
+
+#### Utilisation de base
+
+```bash
+NodeInstall              # Installe la dernière version de Node.js
+NodeInstall 20           # Installe Node.js version 20
+NodeInstall lts          # Installe la dernière version LTS
+NodeInstall 18.17.0      # Installe une version spécifique
+
+# Aliases disponibles
+node_install             # Alias court
+install_node             # Alias alternatif  
+setup_node               # Alias descriptif
+```
+
+#### Fonctionnalités principales
+
+- ✅ **Installation sans sudo** : Tout installé dans `/tmp/tmp/node` et `/tmp/tmp/npm-global`
+- ✅ **Gestionnaire 'n' automatique** : Installation et configuration de 'n' si nécessaire
+- ✅ **Variables d'environnement** : Configuration automatique de `N_PREFIX` et `PATH`
+- ✅ **Vérification complète** : Diagnostic détaillé post-installation
+- ✅ **Versions flexibles** : Support de `latest`, `lts`, ou versions spécifiques
+- ✅ **Configuration permanente** : Intégration avec .zshrc existant
+- ✅ **Gestion d'erreurs** : Messages explicites et rollback si nécessaire
+
+#### Ce qui est configuré automatiquement
+
+```bash
+export N_PREFIX="/tmp/tmp/node"
+export PATH="/tmp/tmp/node/bin:/tmp/tmp/npm-global/bin:$PATH"
+npm config set prefix '/tmp/tmp/npm-global'
+```
+
+#### Exemple de sortie
+
+```bash
+$ NodeInstall
+🚀 Installation de Node.js et npm dans /tmp/tmp...
+📌 Version demandée: latest
+📁 Création des répertoires...
+🔧 Configuration des variables d'environnement...
+🔍 Vérification de npm...
+📦 Installation du gestionnaire de versions Node.js 'n'...
+✅ 'n' installé avec succès
+🔄 Installation de Node.js latest...
+🔄 Mise à jour du cache des commandes...
+🧪 Vérification de l'installation...
+✅ Installation réussie!
+📋 Résumé:
+   • Node.js: v24.5.0 (installé dans /tmp/tmp/node)
+   • npm: 11.5.1
+   • Préfixe npm global: /tmp/tmp/npm-global
+✅ Configuration déjà présente dans le .zshrc
+
+🎉 Node.js et npm sont maintenant disponibles sans privilèges sudo!
+💡 Commandes utiles:
+   • node --version    # Vérifier la version de Node.js
+   • npm --version     # Vérifier la version de npm
+   • n latest          # Mettre à jour vers la dernière version
+   • n <version>       # Installer une version spécifique
+   • n ls              # Lister les versions installées
+```
+
+#### Avantages dans l'environnement 42
+
+- 🔒 **Pas de sudo requis** : Fonctionne avec les restrictions de droits
+- 💾 **Optimisation espace** : Installation dans `/tmp/tmp` (pas dans le quota utilisateur)
+- ⚡ **Rapide et efficace** : Une seule commande pour tout configurer
+- 🔄 **Réutilisable** : Peut installer différentes versions selon les projets
+- 🛡️ **Sécurisé** : Gestion d'erreurs complète et diagnostics détaillés
