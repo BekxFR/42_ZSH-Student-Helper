@@ -50,15 +50,16 @@ Ce projet fournit une configuration ZSH complète avec Oh-My-Zsh, le thème Agno
 
 - 🌈 **Prompt personnalisé** : Thème Agnoster avec emojis aléatoires et informations contextuelles
 - 🔌 **Plugins optimisés** : Syntax highlighting, autosuggestions, Git helpers
-- ⚡ **Aliases essentiels** : `bp`, `sa`, `x`, `Wcc` pour un workflow rapide
+- ✨ **Aliases essentiels** : `bp`, `sa`, `x`, `Wcc` pour un workflow rapide
 - 🎛️ **Contrôles intelligents** : Gestion des logs, prompt, et setup via commandes simples
 - 🎧 **Discord portable** : Installation et lancement automatique de Discord (`discord`)
 
 **🔧 Outils de développement :**
 
 - 📏 **Norminette Python** : Configuration automatique de flake8 (`PyNormInstall`)
-- � **Node.js portable** : Installation automatique de Node.js et npm sans sudo (`NodeInstall`)
-- �🔄 **rlwrap intelligent** : Installation et utilisation automatique via Homebrew
+- 🎨 **C Formatter 42** : Installation automatique de c_formatter_42 pour VS Code (`c_formatter_42_pipInstall`)
+- 📚 **Node.js portable** : Installation automatique de Node.js et npm sans sudo (`NodeInstall`)
+- 🔄 **rlwrap intelligent** : Installation et utilisation automatique via Homebrew
 - 📤 **Git workflow** : Fonction `GF` pour add/commit/push en une commande
 - 🧹 **Nettoyage navigateurs** : Déblocage Chrome/Brave (`GoC`, `BrC`)
 
@@ -100,11 +101,13 @@ x     # Clear terminal
 ### Fonctions pratiques
 
 ```bash
-GF "message"   # Git add + commit + push
-NodeInstall    # Installer Node.js et npm sans sudo
-discord        # Télécharger et lancer Discord automatiquement
-STmp           # Ouvrir dossier temporaire dans VS Code
-Wcc            # Compiler avec gcc -Wall -Wextra -Werror
+GF "message"                    # Git add + commit + push
+NodeInstall                     # Installer Node.js et npm sans sudo
+PyNormInstall                   # Installer norminette (flake8) pour Python
+c_formatter_42_pipInstall       # Installer c_formatter_42 pour VS Code 42 C-Format
+discord                         # Télécharger et lancer Discord automatiquement
+STmp                           # Ouvrir dossier temporaire dans VS Code
+Wcc                            # Compiler avec gcc -Wall -Wextra -Werror
 ```
 
 ### Contrôle de l'environnement

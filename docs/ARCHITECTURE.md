@@ -54,6 +54,7 @@ trap rollback ERR SIGINT SIGTERM
 ```
 
 **Signaux gérés par le trap :**
+
 - `ERR` : Erreur bash (commande retournant un code non-zéro avec `set -e`)
 - `SIGINT` : Interruption clavier (Ctrl+C)
 - `SIGTERM` : Signal de terminaison propre du système
@@ -88,6 +89,7 @@ setup_async_mode() {
         { install_homebrew_if_needed >/dev/null 2>&1; } &!
     fi
     { setup_norminette_alias >/dev/null 2>&1; } &!
+    { c_formatter_42_pipInstall >/dev/null 2>&1; } &!
     setopt NOTIFY
     logs_debug "Fonctions de setup lancées en arrière-plan"
 }
@@ -100,6 +102,7 @@ setup_sync_mode() {
         install_homebrew_if_needed
     fi
     setup_norminette_alias
+    c_formatter_42_pipInstall
     logs_debug "Fonctions de setup exécutées de manière synchrone"
 }
 ```
@@ -178,6 +181,12 @@ setup_environment() {
         logs_debug "Configuration Python/XDG terminée"
     fi
 
+    # Suppression du SingletonLock pour Chrome
+    local lock_file="$HOME/.config/google-chrome/SingletonLock"
+    if [[ -f "$lock_file" ]]; then
+        rm -f "$lock_file" 2>/dev/null
+    fi
+
     # Configuration Homebrew avec PATH correct
     if [[ -d "$homebrew_dir/bin" ]]; then
         if [[ -x "$homebrew_dir/bin/brew" ]]; then
@@ -197,6 +206,68 @@ setup_environment() {
     logs_debug "Configuration de l'environnement terminée"
 }
 ```
+
+### Outils de développement automatiques
+
+Le système inclut des fonctions d'installation automatique d'outils essentiels :
+
+#### c_formatter_42_pipInstall
+
+```bash
+c_formatter_42_pipInstall() {
+    local pip_path="$(command -v pip3 2>/dev/null)"
+
+    if [[ -z "$pip_path" ]]; then
+        logs_warning "pip3 non trouvé, installation de c_formatter_42 annulée"
+        return 1
+    fi
+
+    logs_info "Installation de c_formatter_42 via pip en arrière-plan..."
+    if pip3 install c_formatter_42 >/dev/null 2>&1; then
+        logs_success "c_formatter_42 installé avec succès"
+    else
+        logs_error "Échec de l'installation de c_formatter_42"
+        return 1
+    fi
+}
+```
+
+**Rôle architectural** :
+
+- 🎯 **Support VS Code** : Package nécessaire pour l'extension "42 C-Format"
+- 🔄 **Exécution automatique** : Intégré dans le setup initial (sync/async)
+- 🛡️ **Gestion d'erreurs** : Détection pip3 et retour explicite
+- 📦 **Installation silencieuse** : Mode arrière-plan pour ne pas interrompre l'utilisateur
+- ⚡ **Performance** : Installation parallèle avec autres outils en mode async
+
+#### setup_norminette_alias
+
+```bash
+setup_norminette_alias() {
+    local flake8_locations=(
+        "/tmp/tmp/bin/flake8"
+        "/mnt/nfs/homes/$(whoami)/.local/bin/flake8"
+        "$(command -v flake8 2>/dev/null)"
+    )
+
+    for location in "${flake8_locations[@]}"; do
+        if [[ -n "$location" && -x "$location" ]]; then
+            alias norminette="$location"
+            logs_success "Norminette configuré: $location"
+            return 0
+        fi
+    done
+
+    logs_warning "Norminette (flake8) non trouvé"
+    return 1
+}
+```
+
+**Architecture modulaire** :
+
+- 🎯 **Recherche intelligente** : Multiple emplacements possibles
+- 🔧 **Configuration automatique** : Alias `norminette` pour Python
+- 📍 **Priorité optimisée** : `/tmp/tmp` d'abord, puis utilisateur, puis système
 
 ## Tests et validation
 

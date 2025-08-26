@@ -73,14 +73,23 @@ GF "message"     # Git add + commit + push en une commande
 ### Environnement Python
 
 ```bash
-PyNormInstall    # Installer norminette (flake8) pour python via pip
+PyNormInstall            # Installer norminette (flake8) pour python via pip
+c_formatter_42_pipInstall # Installer c_formatter_42 pour l'extension VS Code 42 C-Format
 ```
 
-**Fonctionnalités** :
+**PyNormInstall - Fonctionnalités** :
 
 - Détection automatique de pip3
 - Installation via `--user` pour éviter les conflits
 - Configuration automatique de l'alias `norminette`
+
+**c_formatter_42_pipInstall - Fonctionnalités** :
+
+- Installation automatique du package `c_formatter_42` via pip3
+- Support pour l'extension VS Code "42 C-Format"
+- Détection automatique de pip3
+- Installation silencieuse en arrière-plan
+- Messages d'erreur informatifs en cas d'échec
 
 ```bash
 rlwrap           # Installation et utilisation automatique si Homebrew disponible
@@ -181,7 +190,7 @@ NodeInstall 18.17.0      # Installe une version spécifique
 
 # Aliases disponibles
 node_install             # Alias court
-install_node             # Alias alternatif  
+install_node             # Alias alternatif
 setup_node               # Alias descriptif
 ```
 
@@ -237,6 +246,6 @@ $ NodeInstall
 
 - 🔒 **Pas de sudo requis** : Fonctionne avec les restrictions de droits
 - 💾 **Optimisation espace** : Installation dans `/tmp/tmp` (pas dans le quota utilisateur)
-- ⚡ **Rapide et efficace** : Une seule commande pour tout configurer
+- 💥 **Rapide et efficace** : Une seule commande pour tout configurer
 - 🔄 **Réutilisable** : Peut installer différentes versions selon les projets
 - 🛡️ **Sécurisé** : Gestion d'erreurs complète et diagnostics détaillés

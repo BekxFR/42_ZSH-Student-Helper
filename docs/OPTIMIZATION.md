@@ -87,6 +87,7 @@ setup_async_mode() {
         { install_homebrew_if_needed >/dev/null 2>&1; } &!
     fi
     { setup_norminette_alias >/dev/null 2>&1; } &!
+    { c_formatter_42_pipInstall >/dev/null 2>&1; } &!
     setopt NOTIFY
 }
 ```
@@ -104,6 +105,7 @@ setup_sync_mode() {
         install_homebrew_if_needed
     fi
     setup_norminette_alias
+    c_formatter_42_pipInstall
     logs_debug "Fonctions de setup exécutées de manière synchrone"
 }
 ```

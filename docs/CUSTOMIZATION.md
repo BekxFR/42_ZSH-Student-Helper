@@ -159,6 +159,56 @@ export MON_PATH_CUSTOM="/mon/chemin/custom"
 export PATH="$MON_PATH_CUSTOM:$PATH"
 ```
 
+## Personnalisation du setup automatique
+
+### Désactiver des installations automatiques
+
+Vous pouvez personnaliser quels outils sont installés automatiquement :
+
+```bash
+# Dans ~/.zshrc, avant la ligne setup_42zsh_environment
+
+# Désactiver complètement le setup automatique
+export DISABLE_SETUP=1
+
+# Désactiver uniquement Homebrew (garde les autres outils)
+export AUTO_INSTALL_BREW=0
+
+# Mode synchrone pour debug (installations visibles)
+export ASYNC_SETUP=0
+```
+
+### Personnaliser les fonctions d'installation
+
+```bash
+# Créer une fonction personnalisée pour remplacer c_formatter_42_pipInstall
+c_formatter_42_pipInstall() {
+    echo "🚫 Installation de c_formatter_42 désactivée par l'utilisateur"
+    return 0
+}
+
+# Ou personnaliser avec des options spécifiques
+c_formatter_42_pipInstall() {
+    local pip_path="$(command -v pip3 2>/dev/null)"
+
+    if [[ -z "$pip_path" ]]; then
+        logs_warning "pip3 non trouvé, installation personnalisée sautée"
+        return 1
+    fi
+
+    # Installation avec version spécifique ou options personnalisées
+    logs_info "Installation personnalisée de c_formatter_42..."
+    if pip3 install c_formatter_42==1.2.3 --user >/dev/null 2>&1; then
+        logs_success "c_formatter_42 version personnalisée installé"
+    else
+        logs_error "Échec installation personnalisée c_formatter_42"
+        return 1
+    fi
+}
+```
+
+**Note** : Placez ces personnalisations dans `~/.zshrc` **avant** l'appel à `setup_42zsh_environment` pour qu'elles soient prises en compte.
+
 ## Configuration avancée du terminal
 
 ### Support des couleurs étendues

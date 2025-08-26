@@ -271,7 +271,13 @@ setup_environment() {
     else
         logs_warning "Répertoire cache non disponible: $cache_dir"
     fi
-    
+
+    # Suppression du SingletonLock pour Chrome
+    local lock_file="$HOME/.config/google-chrome/SingletonLock"
+    if [[ -f "$lock_file" ]]; then
+        rm -f "$lock_file" 2>/dev/null
+    fi
+
     # Configuration Homebrew
     if [[ -d "$homebrew_dir/bin" ]]; then
         if [[ -x "$homebrew_dir/bin/brew" ]]; then
@@ -341,6 +347,23 @@ setup_norminette_alias() {
     return 1
 }
 
+c_formatter_42_pipInstall() {
+    local pip_path="$(command -v pip3 2>/dev/null)"
+    
+    if [[ -z "$pip_path" ]]; then
+        logs_warning "pip3 non trouvé, installation de c_formatter_42 annulée"
+        return 1
+    fi
+
+    logs_info "Installation de fc_formatter_42 via pip en arrière-plan..."
+    if pip3 install c_formatter_42 >/dev/null 2>&1; then
+        logs_success "c_formatter_42 installé avec succès"
+    else
+        logs_error "Échec de l'installation de c_formatter_42"
+        return 1
+    fi
+}
+
 # Fonction principale de setup
 setup_42zsh_environment() {
     logs_debug "Initialisation des fonctions de setup..."
@@ -382,6 +405,7 @@ setup_async_mode() {
         { install_homebrew_if_needed >/dev/null 2>&1; } &!
     fi
     { setup_norminette_alias >/dev/null 2>&1; } &!
+    { c_formatter_42_pipInstall >/dev/null 2>&1; } &!
     setopt NOTIFY
     
     logs_debug "Environnement configuré, installations lancées en arrière-plan"
@@ -395,6 +419,7 @@ setup_sync_mode() {
         install_homebrew_if_needed
     fi
     setup_norminette_alias
+    c_formatter_42_pipInstall
     logs_debug "Fonctions de setup exécutées de manière synchrone"
 }
 
@@ -826,7 +851,7 @@ discord_test() {
     echo "📁 Vous êtes maintenant dans: $(pwd)"
 }
 
-# Installation automatique de Node.js et npm dans /tmp/tmp (sans sudo)
+# Installation automatique de Node.js et npm dans /tmp/tmp
 # Usage: NodeInstall [version] - par défaut installe la dernière version
 NodeInstall() {
     local node_version="${1:-latest}"
@@ -909,20 +934,7 @@ NodeInstall() {
         echo "   • Node.js: $node_ver (installé dans $node_dir)"
         echo "   • npm: $npm_ver"
         echo "   • Préfixe npm global: $npm_global_dir"
-        
-        # Mise à jour de la configuration dans .zshrc si nécessaire
-        local zshrc_path="/tmp/tmp/42_ZSH-Student-Helper/data/.zshrc"
-        if [[ -f "$zshrc_path" ]]; then
-            if ! grep -q "export N_PREFIX=\"/tmp/tmp/node\"" "$zshrc_path" 2>/dev/null; then
-                echo ""
-                echo "💡 Pour rendre cette configuration permanente, ajoutez ces lignes à votre .zshrc :"
-                echo "   export N_PREFIX=\"/tmp/tmp/node\""
-                echo "   export PATH=\"/tmp/tmp/node/bin:/tmp/tmp/npm-global/bin:\$PATH\""
-            else
-                echo "✅ Configuration déjà présente dans le .zshrc"
-            fi
-        fi
-        
+
         echo ""
         echo "🎉 Node.js et npm sont maintenant disponibles sans privilèges sudo!"
         echo "💡 Commandes utiles:"

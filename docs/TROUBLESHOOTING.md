@@ -136,11 +136,38 @@ brew install rlwrap
 ### Rollback inattendu lors de l'installation
 
 **Explication des signaux** :
+
 - `ERR` : Erreur bash (commande échouée avec `set -e`)
 - `SIGINT` : Interruption clavier (Ctrl+C)
 - `SIGTERM` : Signal de terminaison système
 - ~~`EXIT`~~ : Se déclenche à chaque sortie, même réussie
 
+### c_formatter_42 non installé - Extension VS Code 42 C-Format
+
+**Symptômes** : Extension VS Code "42 C-Format" ne fonctionne pas, erreurs de formatage C
+
+```bash
+# Diagnostic
+pip3 show c_formatter_42 2>/dev/null || echo "c_formatter_42 non installé"
+which pip3 || echo "pip3 non disponible"
+
+# Solutions
+# 1. Installation automatique via fonction intégrée
+c_formatter_42_pipInstall
+
+# 2. Installation manuelle
+pip3 install c_formatter_42
+
+# 3. Vérification installation
+pip3 show c_formatter_42
+c_formatter_42 --version 2>/dev/null || echo "Installation échouée"
+
+# 4. Si pip3 n'est pas disponible
+# Sur les systèmes 42, installer python3-pip via gestionnaire de paquets
+# ou utiliser l'environnement Python dans /tmp/tmp si configuré
+```
+
+**Note** : Cette extension améliore significativement le workflow de développement C à l'école 42 en formatant automatiquement le code selon la norme.
 
 ## Reset complet
 

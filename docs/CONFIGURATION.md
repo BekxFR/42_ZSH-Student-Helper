@@ -79,6 +79,47 @@ alias setup_status='echo "📊 ASYNC_SETUP: ${ASYNC_SETUP:-0}, AUTO_INSTALL_BREW
 
 ## Configuration PATH optimisée
 
+### Setup automatique des outils de développement
+
+Le système configure automatiquement plusieurs outils essentiels lors du démarrage :
+
+```bash
+# Dans setup_42zsh_environment()
+setup_norminette_alias    # Configuration automatique de flake8 comme norminette
+c_formatter_42_pipInstall # Installation automatique de c_formatter_42 pour VS Code
+```
+
+**c_formatter_42_pipInstall** :
+
+Cette fonction s'exécute automatiquement en arrière-plan lors du setup initial pour installer le package Python nécessaire à l'extension VS Code "42 C-Format".
+
+```bash
+c_formatter_42_pipInstall() {
+    local pip_path="$(command -v pip3 2>/dev/null)"
+
+    if [[ -z "$pip_path" ]]; then
+        logs_warning "pip3 non trouvé, installation de c_formatter_42 annulée"
+        return 1
+    fi
+
+    logs_info "Installation de c_formatter_42 via pip en arrière-plan..."
+    if pip3 install c_formatter_42 >/dev/null 2>&1; then
+        logs_success "c_formatter_42 installé avec succès"
+    else
+        logs_error "Échec de l'installation de c_formatter_42"
+        return 1
+    fi
+}
+```
+
+**Fonctionnalités** :
+
+- ✅ **Installation automatique** : S'exécute au démarrage du shell
+- ✅ **Mode silencieux** : Installation en arrière-plan sans interrompre l'utilisateur
+- ✅ **Détection pip3** : Vérification de la disponibilité de pip3
+- ✅ **Gestion d'erreurs** : Messages informatifs en cas de problème
+- ✅ **Support VS Code** : Permet le bon fonctionnement de l'extension "42 C-Format"
+
 ### Corrections récentes
 
 Le système configure le PATH pour Homebrew :
