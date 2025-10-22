@@ -1473,3 +1473,156 @@ alias env_safety='EnvironmentSafetyCheck'
 if [[ "${AUTO_SAFETY_CHECK:-0}" == "1" ]]; then
     EnvironmentSafetyCheck
 fi
+
+# =============================================================================
+# CONFIGURATION INTERACTIVE DES VARIABLES PORTABLES
+# =============================================================================
+
+# Fonction de configuration interactive
+ConfigurePortableEnvironment() {
+    echo "🎛️  Configuration de l'Environnement Portable"
+    echo "============================================="
+    echo ""
+    
+    echo "Sélectionnez les fonctionnalités à activer :"
+    echo ""
+    
+    # Java
+    echo -n "1. Java portable (JAVA_HOME) [y/N]: "
+    read -r java_choice
+    [[ "$java_choice" =~ ^[Yy]$ ]] && export STUDENT_USE_PORTABLE_JAVA=1 || export STUDENT_USE_PORTABLE_JAVA=0
+    
+    # Python
+    echo -n "2. Python portable (PYTHONUSERBASE, PIP_USER) [y/N]: "
+    read -r python_choice
+    [[ "$python_choice" =~ ^[Yy]$ ]] && export STUDENT_USE_PORTABLE_PYTHON=1 || export STUDENT_USE_PORTABLE_PYTHON=0
+    
+    # Docker
+    echo -n "3. Docker portable (DOCKER_CONFIG) [y/N]: "
+    read -r docker_choice
+    [[ "$docker_choice" =~ ^[Yy]$ ]] && export STUDENT_USE_PORTABLE_DOCKER=1 || export STUDENT_USE_PORTABLE_DOCKER=0
+    
+    # VS Code
+    echo -n "4. VS Code portable (extensions) [y/N]: "
+    read -r vscode_choice
+    [[ "$vscode_choice" =~ ^[Yy]$ ]] && export STUDENT_USE_PORTABLE_VSCODE=1 || export STUDENT_USE_PORTABLE_VSCODE=0
+    
+    # IntelliJ IDEA
+    echo -n "5. IntelliJ IDEA portable [y/N]: "
+    read -r idea_choice
+    [[ "$idea_choice" =~ ^[Yy]$ ]] && export STUDENT_USE_PORTABLE_IDEA=1 || export STUDENT_USE_PORTABLE_IDEA=0
+    
+    # XDG (CRITIQUE)
+    echo ""
+    echo "⚠️  ATTENTION: Variables XDG (IMPACT CRITIQUE)"
+    echo "   Ceci affectera TOUTES les applications Linux qui utilisent les standards XDG"
+    echo "   Applications concernées: Firefox, Chrome, LibreOffice, GNOME, KDE, etc."
+    echo -n "6. Variables XDG portables (XDG_CONFIG_HOME, XDG_DATA_HOME) [y/N]: "
+    read -r xdg_choice
+    [[ "$xdg_choice" =~ ^[Yy]$ ]] && export STUDENT_USE_PORTABLE_XDG=1 || export STUDENT_USE_PORTABLE_XDG=0
+    
+    echo ""
+    echo "📋 Résumé de la configuration :"
+    echo "   Java portable    : ${STUDENT_USE_PORTABLE_JAVA}"
+    echo "   Python portable  : ${STUDENT_USE_PORTABLE_PYTHON}"
+    echo "   Docker portable  : ${STUDENT_USE_PORTABLE_DOCKER}"
+    echo "   VS Code portable : ${STUDENT_USE_PORTABLE_VSCODE}"
+    echo "   IDEA portable    : ${STUDENT_USE_PORTABLE_IDEA}"
+    echo "   XDG portable     : ${STUDENT_USE_PORTABLE_XDG}"
+    
+    echo ""
+    echo "💾 Sauvegarder cette configuration de manière permanente ?"
+    echo -n "   Ajouter au ~/.zshrc [y/N]: "
+    read -r save_choice
+    
+    if [[ "$save_choice" =~ ^[Yy]$ ]]; then
+        local config_file="$HOME/.zshrc"
+        
+        # Supprimer les anciennes configurations si elles existent
+        sed -i '/# 42 ZSH Helper - Configuration Portable/,/# Fin Configuration Portable/d' "$config_file" 2>/dev/null
+        
+        # Ajouter la nouvelle configuration
+        cat >> "$config_file" << EOF
+
+# 42 ZSH Helper - Configuration Portable
+export STUDENT_USE_PORTABLE_JAVA=${STUDENT_USE_PORTABLE_JAVA}
+export STUDENT_USE_PORTABLE_PYTHON=${STUDENT_USE_PORTABLE_PYTHON}
+export STUDENT_USE_PORTABLE_DOCKER=${STUDENT_USE_PORTABLE_DOCKER}
+export STUDENT_USE_PORTABLE_VSCODE=${STUDENT_USE_PORTABLE_VSCODE}
+export STUDENT_USE_PORTABLE_IDEA=${STUDENT_USE_PORTABLE_IDEA}
+export STUDENT_USE_PORTABLE_XDG=${STUDENT_USE_PORTABLE_XDG}
+# Fin Configuration Portable
+EOF
+        
+        echo "✅ Configuration sauvegardée dans $config_file"
+    fi
+    
+    echo ""
+    echo "🔄 Pour appliquer les changements, redémarrez votre terminal :"
+    echo "   exec zsh"
+    
+    echo ""
+    echo "🔍 Pour vérifier la configuration :"
+    echo "   safety_check"
+}
+
+# Configuration rapide pour XDG uniquement
+EnableXDGPortable() {
+    echo "⚠️  ACTIVATION DES VARIABLES XDG PORTABLES"
+    echo "==========================================="
+    echo ""
+    echo "🚨 ATTENTION: Ceci affectera TOUTES les applications utilisant XDG"
+    echo "   Applications concernées: Firefox, Chrome, LibreOffice, etc."
+    echo ""
+    echo "💡 Vos configurations actuelles seront préservées mais les nouvelles"
+    echo "   configurations seront créées dans l'espace temporaire."
+    echo ""
+    echo -n "Êtes-vous sûr de vouloir continuer ? [y/N]: "
+    read -r confirm
+    
+    if [[ "$confirm" =~ ^[Yy]$ ]]; then
+        export STUDENT_USE_PORTABLE_XDG=1
+        echo ""
+        echo "✅ Variables XDG portables activées pour cette session"
+        echo "🔄 Redémarrez votre terminal pour appliquer : exec zsh"
+        echo ""
+        echo "💾 Pour rendre permanent, ajoutez à votre ~/.zshrc :"
+        echo "   export STUDENT_USE_PORTABLE_XDG=1"
+    else
+        echo "❌ Activation annulée"
+    fi
+}
+
+# Désactivation rapide de toutes les variables portables
+DisableAllPortable() {
+    export STUDENT_USE_PORTABLE_JAVA=0
+    export STUDENT_USE_PORTABLE_PYTHON=0
+    export STUDENT_USE_PORTABLE_DOCKER=0
+    export STUDENT_USE_PORTABLE_VSCODE=0
+    export STUDENT_USE_PORTABLE_IDEA=0
+    export STUDENT_USE_PORTABLE_XDG=0
+    
+    echo "🛡️  Toutes les variables portables désactivées"
+    echo "🔄 Redémarrez votre terminal pour appliquer : exec zsh"
+}
+
+# Affichage de l'état actuel
+ShowPortableStatus() {
+    echo "📊 État Actuel des Variables Portables"
+    echo "======================================"
+    echo ""
+    echo "Java portable    : ${STUDENT_USE_PORTABLE_JAVA:-0} $([ "${STUDENT_USE_PORTABLE_JAVA:-0}" = "1" ] && echo "✅" || echo "❌")"
+    echo "Python portable  : ${STUDENT_USE_PORTABLE_PYTHON:-0} $([ "${STUDENT_USE_PORTABLE_PYTHON:-0}" = "1" ] && echo "✅" || echo "❌")"
+    echo "Docker portable  : ${STUDENT_USE_PORTABLE_DOCKER:-0} $([ "${STUDENT_USE_PORTABLE_DOCKER:-0}" = "1" ] && echo "✅" || echo "❌")"
+    echo "VS Code portable : ${STUDENT_USE_PORTABLE_VSCODE:-0} $([ "${STUDENT_USE_PORTABLE_VSCODE:-0}" = "1" ] && echo "✅" || echo "❌")"
+    echo "IDEA portable    : ${STUDENT_USE_PORTABLE_IDEA:-0} $([ "${STUDENT_USE_PORTABLE_IDEA:-0}" = "1" ] && echo "✅" || echo "❌")"
+    echo "XDG portable     : ${STUDENT_USE_PORTABLE_XDG:-0} $([ "${STUDENT_USE_PORTABLE_XDG:-0}" = "1" ] && echo "✅ ⚠️" || echo "❌")"
+    echo ""
+    echo "💡 Utilisez 'configure_portable' pour modifier ces paramètres"
+}
+
+# Aliases pratiques
+alias configure_portable='ConfigurePortableEnvironment'
+alias enable_xdg='EnableXDGPortable'
+alias disable_all_portable='DisableAllPortable'
+alias portable_status='ShowPortableStatus'
