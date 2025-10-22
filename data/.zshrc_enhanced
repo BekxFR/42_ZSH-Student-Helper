@@ -1,0 +1,423 @@
+# Configuration améliorée pour tous les outils de développement modernes
+# Ajout après la ligne STUDENT_WORKSPACE existante
+
+# =============================================================================
+# CONFIGURATION DÉVELOPPEMENT MODERNE - COMPLETE
+# =============================================================================
+
+# Variables de base (déjà présentes)
+export STUDENT_WORKSPACE="/tmp/tmp/${USER:-$(whoami)}"
+
+# Configuration Node.js et npm (existant - gardé)
+export N_PREFIX="$STUDENT_WORKSPACE/node"
+export PATH="$STUDENT_WORKSPACE/node/bin:$STUDENT_WORKSPACE/npm-global/bin:$PATH"
+
+# Configuration Java et outils JVM (conditionnelle pour préserver l'existant)
+[[ "$STUDENT_USE_PORTABLE_JAVA" == "1" ]] && export JAVA_HOME="$STUDENT_WORKSPACE/java"
+export MAVEN_HOME="$STUDENT_WORKSPACE/maven"
+export GRADLE_HOME="$STUDENT_WORKSPACE/gradle"
+export GRADLE_USER_HOME="$STUDENT_WORKSPACE/.gradle"
+[[ -n "$JAVA_HOME" ]] && export PATH="$JAVA_HOME/bin:$MAVEN_HOME/bin:$GRADLE_HOME/bin:$PATH"
+
+# Configuration Android Development
+export ANDROID_HOME="$STUDENT_WORKSPACE/android-sdk"
+export ANDROID_SDK_ROOT="$ANDROID_HOME"
+export ANDROID_USER_HOME="$STUDENT_WORKSPACE/.android"
+export PATH="$ANDROID_HOME/tools:$ANDROID_HOME/tools/bin:$ANDROID_HOME/platform-tools:$PATH"
+
+# Configuration Rust
+export CARGO_HOME="$STUDENT_WORKSPACE/.cargo"
+export RUSTUP_HOME="$STUDENT_WORKSPACE/.rustup"
+export PATH="$CARGO_HOME/bin:$PATH"
+
+# Configuration Go
+export GOPATH="$STUDENT_WORKSPACE/go"
+export GOCACHE="$STUDENT_WORKSPACE/.cache/go-build"
+export GOMODCACHE="$STUDENT_WORKSPACE/go/pkg/mod"
+export PATH="$GOPATH/bin:$PATH"
+
+# Configuration Python avancée (conditionnelle)
+[[ "$STUDENT_USE_PORTABLE_PYTHON" == "1" ]] && {
+    export PYTHONUSERBASE="$STUDENT_WORKSPACE"
+    export PIP_USER="1"
+}
+export POETRY_HOME="$STUDENT_WORKSPACE/.poetry"
+export CONDA_PKGS_DIRS="$STUDENT_WORKSPACE/.conda/pkgs"
+export CONDA_ENVS_PATH="$STUDENT_WORKSPACE/.conda/envs"
+
+# Configuration Docker (conditionnelle si utilisable sans sudo)
+[[ "$STUDENT_USE_PORTABLE_DOCKER" == "1" ]] && export DOCKER_CONFIG="$STUDENT_WORKSPACE/.docker"
+
+# Configuration IDE et éditeurs (conditionnelle)
+[[ "$STUDENT_USE_PORTABLE_VSCODE" == "1" ]] && export VSCODE_PORTABLE_EXTENSIONS="$STUDENT_WORKSPACE/.vscode-extensions"
+[[ "$STUDENT_USE_PORTABLE_IDEA" == "1" ]] && export IDEA_HOME="$STUDENT_WORKSPACE/.idea"
+
+# Configuration des caches génériques (ATTENTION: Impact élevé sur les configurations existantes)
+# Ces variables sont définies uniquement si explicitement demandées
+[[ "$STUDENT_USE_PORTABLE_XDG" == "1" ]] && {
+    export XDG_CACHE_HOME="$STUDENT_WORKSPACE/.cache"
+    export XDG_CONFIG_HOME="$STUDENT_WORKSPACE/.config"
+    export XDG_DATA_HOME="$STUDENT_WORKSPACE/.local/share"
+    echo "⚠️  ATTENTION: Configuration XDG portable activée - peut affecter les configurations d'applications existantes"
+}
+
+# =============================================================================
+# FONCTIONS D'INSTALLATION AUTOMATIQUE COMPLÈTES
+# =============================================================================
+
+# Installation Java OpenJDK
+JavaInstall() {
+    local java_version="${1:-17}"
+    local java_dir="$STUDENT_WORKSPACE/java"
+    
+    echo "Installation de Java OpenJDK $java_version dans l'espace utilisateur..."
+    
+    if [[ ! -d "$java_dir" ]]; then
+        mkdir -p "$java_dir"
+        
+        # Téléchargement via Adoptium ou autre source
+        local download_url="https://download.java.net/openjdk/jdk${java_version}/ri/openjdk-${java_version}+35_linux-x64_bin.tar.gz"
+        
+        echo "Téléchargement de Java $java_version..."
+        if curl -L -o "/tmp/openjdk-${java_version}.tar.gz" "$download_url" 2>/dev/null; then
+            tar -xzf "/tmp/openjdk-${java_version}.tar.gz" -C "$java_dir" --strip-components=1
+            rm "/tmp/openjdk-${java_version}.tar.gz"
+            echo "Java $java_version installé avec succès dans $java_dir"
+        else
+            echo "Erreur: Échec du téléchargement de Java"
+            return 1
+        fi
+    else
+        echo "Java déjà installé dans $java_dir"
+    fi
+    
+    # Mise à jour du PATH
+    export PATH="$java_dir/bin:$PATH"
+    hash -r
+}
+
+# Installation Android SDK (version légère)
+AndroidSDKInstall() {
+    local sdk_dir="$STUDENT_WORKSPACE/android-sdk"
+    local tools_version="${1:-9477386}"  # Version des command-line tools
+    
+    echo "Installation Android SDK dans l'espace utilisateur..."
+    
+    if [[ ! -d "$sdk_dir" ]]; then
+        mkdir -p "$sdk_dir"
+        
+        # Téléchargement des command-line tools uniquement (plus léger qu'Android Studio)
+        local download_url="https://dl.google.com/android/repository/commandlinetools-linux-${tools_version}_latest.zip"
+        
+        echo "Téléchargement Android Command Line Tools..."
+        if curl -L -o "/tmp/android-tools.zip" "$download_url" 2>/dev/null; then
+            unzip "/tmp/android-tools.zip" -d "$sdk_dir" >/dev/null
+            rm "/tmp/android-tools.zip"
+            
+            # Configuration des tools
+            mkdir -p "$sdk_dir/cmdline-tools/latest"
+            mv "$sdk_dir/cmdline-tools"/* "$sdk_dir/cmdline-tools/latest/" 2>/dev/null || true
+            
+            echo "Android SDK Tools installés avec succès"
+            echo "Utilisez 'sdkmanager' pour installer les packages spécifiques"
+        else
+            echo "Erreur: Échec du téléchargement Android SDK"
+            return 1
+        fi
+    else
+        echo "Android SDK déjà installé dans $sdk_dir"
+    fi
+    
+    # Mise à jour du PATH
+    export PATH="$sdk_dir/cmdline-tools/latest/bin:$sdk_dir/platform-tools:$PATH"
+    hash -r
+}
+
+# Installation Rust
+RustInstall() {
+    echo "Installation de Rust dans l'espace utilisateur..."
+    
+    if [[ ! -f "$CARGO_HOME/bin/cargo" ]]; then
+        # Installation via rustup avec variables personnalisées
+        curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | \
+            CARGO_HOME="$CARGO_HOME" RUSTUP_HOME="$RUSTUP_HOME" sh -s -- --no-modify-path -y
+        
+        echo "Rust installé avec succès dans $CARGO_HOME"
+    else
+        echo "Rust déjà installé"
+    fi
+    
+    # Mise à jour du PATH
+    export PATH="$CARGO_HOME/bin:$PATH"
+    hash -r
+}
+
+# Installation Go
+GoInstall() {
+    local go_version="${1:-1.21.4}"
+    local go_dir="$STUDENT_WORKSPACE/go-install"
+    
+    echo "Installation de Go $go_version dans l'espace utilisateur..."
+    
+    if [[ ! -f "$go_dir/bin/go" ]]; then
+        mkdir -p "$go_dir"
+        
+        local download_url="https://dl.google.com/go/go${go_version}.linux-amd64.tar.gz"
+        
+        echo "Téléchargement de Go $go_version..."
+        if curl -L -o "/tmp/go${go_version}.tar.gz" "$download_url" 2>/dev/null; then
+            tar -xzf "/tmp/go${go_version}.tar.gz" -C "$go_dir" --strip-components=1
+            rm "/tmp/go${go_version}.tar.gz"
+            echo "Go $go_version installé avec succès"
+        else
+            echo "Erreur: Échec du téléchargement de Go"
+            return 1
+        fi
+    else
+        echo "Go déjà installé"
+    fi
+    
+    # Mise à jour du PATH
+    export PATH="$go_dir/bin:$PATH"
+    hash -r
+}
+
+# Installation Docker (si supporté sans sudo)
+DockerInstall() {
+    echo "Installation Docker rootless dans l'espace utilisateur..."
+    
+    # Vérification des prérequis
+    if ! command -v uidmap >/dev/null 2>&1; then
+        echo "Erreur: newuidmap/newgidmap requis pour Docker rootless"
+        return 1
+    fi
+    
+    # Installation via le script officiel rootless
+    curl -fsSL https://get.docker.com/rootless | \
+        DOCKER_CONFIG="$DOCKER_CONFIG" sh
+    
+    echo "Docker rootless installé dans $DOCKER_CONFIG"
+    echo "Utilisez 'systemctl --user start docker' pour démarrer"
+}
+
+# Fonction d'installation globale
+DevInstall() {
+    local tool="$1"
+    
+    case "$tool" in
+        "java")
+            JavaInstall "${2:-17}"
+            ;;
+        "android")
+            AndroidSDKInstall "$2"
+            ;;
+        "rust")
+            RustInstall
+            ;;
+        "go")
+            GoInstall "$2"
+            ;;
+        "docker")
+            DockerInstall
+            ;;
+        "all")
+            echo "Installation complète des outils de développement..."
+            JavaInstall
+            AndroidSDKInstall
+            RustInstall
+            GoInstall
+            echo "Installation terminée. Redémarrez votre terminal."
+            ;;
+        *)
+            echo "Usage: DevInstall {java|android|rust|go|docker|all} [version]"
+            echo "Exemples:"
+            echo "  DevInstall java 11"
+            echo "  DevInstall android"
+            echo "  DevInstall all"
+            ;;
+    esac
+}
+
+# Aliases pratiques
+alias install_java='DevInstall java'
+alias install_android='DevInstall android'
+alias install_rust='DevInstall rust'
+alias install_go='DevInstall go'
+alias install_docker='DevInstall docker'
+alias install_all_dev='DevInstall all'
+
+# Fonction de nettoyage intelligente
+CleanupDevSpace() {
+    echo "Nettoyage de l'espace de développement..."
+    
+    # Nettoyage des caches
+    [[ -d "$STUDENT_WORKSPACE/.cache" ]] && find "$STUDENT_WORKSPACE/.cache" -type f -atime +7 -delete 2>/dev/null
+    [[ -d "$GRADLE_USER_HOME/caches" ]] && rm -rf "$GRADLE_USER_HOME/caches/build-cache-*" 2>/dev/null
+    [[ -d "$GOMODCACHE" ]] && go clean -modcache 2>/dev/null
+    
+    # Statistiques d'usage
+    echo "Utilisation actuelle de l'espace:"
+    du -sh "$STUDENT_WORKSPACE" 2>/dev/null || echo "Espace non initialisé"
+    
+    echo "Nettoyage terminé."
+}
+
+alias cleanup_dev='CleanupDevSpace'
+
+# =============================================================================
+# GESTION INTELLIGENTE DES RESSOURCES
+# =============================================================================
+
+# Fonction de monitoring d'espace
+CheckDiskSpace() {
+    local usage=$(du -s "$STUDENT_WORKSPACE" 2>/dev/null | cut -f1)
+    local limit_kb=2097152  # 2GB en KB
+    
+    if [[ $usage -gt $limit_kb ]]; then
+        echo "Attention: Espace utilisateur > 2GB ($((usage/1024))MB)"
+        echo "Utilisez 'cleanup_dev' pour libérer de l'espace"
+        return 1
+    fi
+}
+
+# Vérification automatique à l'ouverture du shell (si activée)
+if [[ "${CHECK_DISK_USAGE:-0}" == "1" ]]; then
+    CheckDiskSpace
+fi
+
+# =============================================================================
+# DIAGNOSTIC ET CONTRÔLE DES VARIABLES D'ENVIRONNEMENT
+# =============================================================================
+
+# Fonction de diagnostic complet des variables d'environnement
+EnvironmentDiagnostic() {
+    echo "=== DIAGNOSTIC ENVIRONNEMENT DÉVELOPPEMENT ==="
+    echo
+    
+    echo "📍 Variables principales:"
+    echo "  STUDENT_WORKSPACE: ${STUDENT_WORKSPACE:-NON DÉFINI}"
+    echo "  USER: ${USER:-NON DÉFINI}"
+    echo
+    
+    echo "☕ Java/JVM:"
+    echo "  JAVA_HOME: ${JAVA_HOME:-NON DÉFINI}"
+    [[ -n "$JAVA_HOME" ]] && echo "    Version: $(java -version 2>&1 | head -n1 | cut -d'"' -f2 2>/dev/null || echo 'N/A')"
+    echo "  GRADLE_USER_HOME: ${GRADLE_USER_HOME:-NON DÉFINI}"
+    echo
+    
+    echo "🐍 Python:"
+    echo "  PYTHONUSERBASE: ${PYTHONUSERBASE:-NON DÉFINI}"
+    echo "  PIP_USER: ${PIP_USER:-NON DÉFINI}"
+    echo "  POETRY_HOME: ${POETRY_HOME:-NON DÉFINI}"
+    echo
+    
+    echo "🦀 Rust:"
+    echo "  CARGO_HOME: ${CARGO_HOME:-NON DÉFINI}"
+    echo "  RUSTUP_HOME: ${RUSTUP_HOME:-NON DÉFINI}"
+    echo
+    
+    echo "🐹 Go:"
+    echo "  GOPATH: ${GOPATH:-NON DÉFINI}"
+    echo "  GOCACHE: ${GOCACHE:-NON DÉFINI}"
+    echo
+    
+    echo "🐳 Docker:"
+    echo "  DOCKER_CONFIG: ${DOCKER_CONFIG:-NON DÉFINI}"
+    echo
+    
+    echo "💻 IDE/Éditeurs:"
+    echo "  VSCODE_PORTABLE_EXTENSIONS: ${VSCODE_PORTABLE_EXTENSIONS:-NON DÉFINI}"
+    echo "  IDEA_HOME: ${IDEA_HOME:-NON DÉFINI}"
+    echo
+    
+    echo "📁 Variables XDG (Impact élevé!):"
+    echo "  XDG_CONFIG_HOME: ${XDG_CONFIG_HOME:-NON DÉFINI (utilise ~/.config)}"
+    echo "  XDG_DATA_HOME: ${XDG_DATA_HOME:-NON DÉFINI (utilise ~/.local/share)}"
+    echo "  XDG_CACHE_HOME: ${XDG_CACHE_HOME:-NON DÉFINI (utilise ~/.cache)}"
+    
+    if [[ -n "$XDG_CONFIG_HOME" || -n "$XDG_DATA_HOME" || -n "$XDG_CACHE_HOME" ]]; then
+        echo "  ⚠️  ATTENTION: Variables XDG redéfinies - peut affecter toutes les applications!"
+    fi
+    echo
+    
+    echo "🎛️  Variables de contrôle (pour activer/désactiver):"
+    echo "  STUDENT_USE_PORTABLE_JAVA: ${STUDENT_USE_PORTABLE_JAVA:-0}"
+    echo "  STUDENT_USE_PORTABLE_PYTHON: ${STUDENT_USE_PORTABLE_PYTHON:-0}"
+    echo "  STUDENT_USE_PORTABLE_DOCKER: ${STUDENT_USE_PORTABLE_DOCKER:-0}"
+    echo "  STUDENT_USE_PORTABLE_VSCODE: ${STUDENT_USE_PORTABLE_VSCODE:-0}"
+    echo "  STUDENT_USE_PORTABLE_IDEA: ${STUDENT_USE_PORTABLE_IDEA:-0}"
+    echo "  STUDENT_USE_PORTABLE_XDG: ${STUDENT_USE_PORTABLE_XDG:-0}"
+    echo
+    
+    echo "📊 Analyse d'impact:"
+    local impact_level="FAIBLE"
+    local warnings=0
+    
+    [[ -n "$JAVA_HOME" && "$JAVA_HOME" == "$STUDENT_WORKSPACE"* ]] && { impact_level="MODÉRÉ"; ((warnings++)); }
+    [[ -n "$PYTHONUSERBASE" ]] && { impact_level="MODÉRÉ"; ((warnings++)); }
+    [[ -n "$XDG_CONFIG_HOME" || -n "$XDG_DATA_HOME" ]] && { impact_level="ÉLEVÉ"; ((warnings+=3)); }
+    
+    echo "  Niveau d'impact: $impact_level"
+    echo "  Nombre d'avertissements: $warnings"
+    
+    if [[ $warnings -gt 0 ]]; then
+        echo
+        echo "🔧 Pour désactiver des fonctionnalités:"
+        echo "  export STUDENT_USE_PORTABLE_JAVA=0    # Utiliser Java système"
+        echo "  export STUDENT_USE_PORTABLE_PYTHON=0  # Utiliser Python système"
+        echo "  export STUDENT_USE_PORTABLE_XDG=0     # Utiliser chemins XDG système"
+        echo "  Puis redémarrez votre terminal"
+    fi
+    
+    echo
+    echo "=== FIN DIAGNOSTIC ==="
+}
+
+# Fonction pour configurer en mode sécurisé (sans impact sur l'existant)
+SafeEnvironmentSetup() {
+    echo "🛡️  Configuration en mode sécurisé (sans impact sur l'existant)..."
+    
+    # Désactiver toutes les variables potentiellement impactantes
+    export STUDENT_USE_PORTABLE_JAVA=0
+    export STUDENT_USE_PORTABLE_PYTHON=0
+    export STUDENT_USE_PORTABLE_DOCKER=0
+    export STUDENT_USE_PORTABLE_VSCODE=0
+    export STUDENT_USE_PORTABLE_IDEA=0
+    export STUDENT_USE_PORTABLE_XDG=0
+    
+    echo "✅ Configuration sécurisée activée"
+    echo "   Seules les variables Node.js, Rust, Go et Android sont actives"
+    echo "   Utilisez 'EnvironmentDiagnostic' pour vérifier"
+}
+
+# Fonction pour activer le mode portable complet
+PortableEnvironmentSetup() {
+    echo "🚀 Configuration en mode portable complet..."
+    echo "⚠️  ATTENTION: Ceci peut affecter vos configurations existantes!"
+    
+    read -p "Êtes-vous sûr de vouloir continuer? (y/N): " -n 1 -r
+    echo
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        echo "❌ Annulé"
+        return 1
+    fi
+    
+    # Activer toutes les variables portables
+    export STUDENT_USE_PORTABLE_JAVA=1
+    export STUDENT_USE_PORTABLE_PYTHON=1
+    export STUDENT_USE_PORTABLE_DOCKER=1
+    export STUDENT_USE_PORTABLE_VSCODE=1
+    export STUDENT_USE_PORTABLE_IDEA=1
+    export STUDENT_USE_PORTABLE_XDG=1
+    
+    echo "✅ Configuration portable complète activée"
+    echo "🔄 Redémarrez votre terminal pour que les changements prennent effet"
+    echo "   Utilisez 'EnvironmentDiagnostic' pour vérifier l'impact"
+}
+
+# Aliases pratiques
+alias env_diagnostic='EnvironmentDiagnostic'
+alias safe_setup='SafeEnvironmentSetup'
+alias portable_setup='PortableEnvironmentSetup'
+
+# =============================================================================

@@ -130,6 +130,53 @@ export STUDENT_WORKSPACE="/tmp/tmp/${USER:-$(whoami)}"
 export N_PREFIX="$STUDENT_WORKSPACE/node"
 export PATH="$STUDENT_WORKSPACE/node/bin:$STUDENT_WORKSPACE/npm-global/bin:$PATH"
 
+# Configuration étendue pour outils de développement modernes
+# Java et outils JVM
+export JAVA_HOME="$STUDENT_WORKSPACE/java"
+export MAVEN_HOME="$STUDENT_WORKSPACE/maven"
+export GRADLE_HOME="$STUDENT_WORKSPACE/gradle"
+export GRADLE_USER_HOME="$STUDENT_WORKSPACE/.gradle"
+
+# Android Development
+export ANDROID_HOME="$STUDENT_WORKSPACE/android-sdk"
+export ANDROID_SDK_ROOT="$ANDROID_HOME"
+export ANDROID_USER_HOME="$STUDENT_WORKSPACE/.android"
+
+# Rust
+export CARGO_HOME="$STUDENT_WORKSPACE/.cargo"
+export RUSTUP_HOME="$STUDENT_WORKSPACE/.rustup"
+
+# Go
+export GOPATH="$STUDENT_WORKSPACE/go"
+export GOCACHE="$STUDENT_WORKSPACE/.cache/go-build"
+export GOMODCACHE="$STUDENT_WORKSPACE/go/pkg/mod"
+
+# Docker (si supporté)
+export DOCKER_CONFIG="$STUDENT_WORKSPACE/.docker"
+
+# Configuration IDE et éditeurs - PRÉSERVATION DE L'ENVIRONNEMENT EXISTANT
+# Note: Ces variables sont optionnelles et n'écrasent pas la configuration système par défaut
+export VSCODE_PORTABLE_EXTENSIONS="$STUDENT_WORKSPACE/.vscode-extensions"
+export IDEA_PORTABLE_HOME="$STUDENT_WORKSPACE/.idea"
+
+# Configuration Python avancée
+export PIP_USER="1"
+export POETRY_HOME="$STUDENT_WORKSPACE/.poetry"
+export CONDA_PKGS_DIRS="$STUDENT_WORKSPACE/.conda/pkgs"
+export CONDA_ENVS_PATH="$STUDENT_WORKSPACE/.conda/envs"
+
+# Configuration des caches génériques XDG (préservation de la config utilisateur)
+# Ces variables ne sont définies que si aucune configuration utilisateur n'existe
+if [[ -z "$XDG_CONFIG_HOME" ]]; then
+    export XDG_CONFIG_HOME="$STUDENT_WORKSPACE/.config"
+fi
+if [[ -z "$XDG_DATA_HOME" ]]; then
+    export XDG_DATA_HOME="$STUDENT_WORKSPACE/.local/share"
+fi
+
+# Mise à jour du PATH pour tous les outils
+export PATH="$JAVA_HOME/bin:$MAVEN_HOME/bin:$GRADLE_HOME/bin:$ANDROID_HOME/tools:$ANDROID_HOME/platform-tools:$CARGO_HOME/bin:$GOPATH/bin:$PATH"
+
 # Fonctions de logging
 logs_error() {
     [[ $LOGLEVEL -ge 1 ]] && echo "❌ $*" >&2
@@ -983,3 +1030,366 @@ NodeInstall() {
 alias node_install='NodeInstall'
 alias install_node='NodeInstall'
 alias setup_node='NodeInstall'
+
+# Installation Java OpenJDK
+JavaInstall() {
+    local java_version="${1:-17}"
+    local java_dir="$STUDENT_WORKSPACE/java"
+    
+    echo "🔧 Installation de Java OpenJDK $java_version dans l'espace utilisateur..."
+    
+    if [[ ! -d "$java_dir" ]]; then
+        mkdir -p "$java_dir"
+        
+        # Téléchargement via Eclipse Adoptium
+        local download_url="https://download.java.net/openjdk/jdk${java_version}/ri/openjdk-${java_version}+35_linux-x64_bin.tar.gz"
+        
+        echo "📥 Téléchargement de Java $java_version..."
+        if curl -L -o "/tmp/openjdk-${java_version}.tar.gz" "$download_url" 2>/dev/null; then
+            tar -xzf "/tmp/openjdk-${java_version}.tar.gz" -C "$java_dir" --strip-components=1
+            rm "/tmp/openjdk-${java_version}.tar.gz"
+            echo "✅ Java $java_version installé avec succès dans $java_dir"
+        else
+            echo "❌ Erreur: Échec du téléchargement de Java"
+            return 1
+        fi
+    else
+        echo "ℹ️ Java déjà installé dans $java_dir"
+    fi
+    
+    # Mise à jour du PATH
+    export PATH="$java_dir/bin:$PATH"
+    hash -r
+}
+
+# Installation Android SDK (version légère)
+AndroidSDKInstall() {
+    local sdk_dir="$STUDENT_WORKSPACE/android-sdk"
+    local tools_version="${1:-9477386}"
+    
+    echo "🤖 Installation Android SDK dans l'espace utilisateur..."
+    
+    if [[ ! -d "$sdk_dir" ]]; then
+        mkdir -p "$sdk_dir"
+        
+        # Téléchargement des command-line tools (plus léger qu'Android Studio)
+        local download_url="https://dl.google.com/android/repository/commandlinetools-linux-${tools_version}_latest.zip"
+        
+        echo "📥 Téléchargement Android Command Line Tools..."
+        if curl -L -o "/tmp/android-tools.zip" "$download_url" 2>/dev/null; then
+            unzip "/tmp/android-tools.zip" -d "$sdk_dir" >/dev/null 2>&1
+            rm "/tmp/android-tools.zip"
+            
+            # Configuration des tools
+            mkdir -p "$sdk_dir/cmdline-tools/latest"
+            mv "$sdk_dir/cmdline-tools"/* "$sdk_dir/cmdline-tools/latest/" 2>/dev/null || true
+            
+            echo "✅ Android SDK Tools installés avec succès"
+            echo "💡 Utilisez 'sdkmanager' pour installer les packages spécifiques"
+        else
+            echo "❌ Erreur: Échec du téléchargement Android SDK"
+            return 1
+        fi
+    else
+        echo "ℹ️ Android SDK déjà installé dans $sdk_dir"
+    fi
+    
+    export PATH="$sdk_dir/cmdline-tools/latest/bin:$sdk_dir/platform-tools:$PATH"
+    hash -r
+}
+
+# Installation Rust
+RustInstall() {
+    echo "🦀 Installation de Rust dans l'espace utilisateur..."
+    
+    if [[ ! -f "$CARGO_HOME/bin/cargo" ]]; then
+        mkdir -p "$CARGO_HOME" "$RUSTUP_HOME"
+        
+        echo "📥 Téléchargement et installation de Rust..."
+        curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | \
+            CARGO_HOME="$CARGO_HOME" RUSTUP_HOME="$RUSTUP_HOME" sh -s -- --no-modify-path -y
+        
+        echo "✅ Rust installé avec succès dans $CARGO_HOME"
+    else
+        echo "ℹ️ Rust déjà installé"
+    fi
+    
+    export PATH="$CARGO_HOME/bin:$PATH"
+    hash -r
+}
+
+# Installation Go
+GoInstall() {
+    local go_version="${1:-1.21.4}"
+    local go_dir="$STUDENT_WORKSPACE/go-install"
+    
+    echo "🐹 Installation de Go $go_version dans l'espace utilisateur..."
+    
+    if [[ ! -f "$go_dir/bin/go" ]]; then
+        mkdir -p "$go_dir"
+        
+        local download_url="https://dl.google.com/go/go${go_version}.linux-amd64.tar.gz"
+        
+        echo "📥 Téléchargement de Go $go_version..."
+        if curl -L -o "/tmp/go${go_version}.tar.gz" "$download_url" 2>/dev/null; then
+            tar -xzf "/tmp/go${go_version}.tar.gz" -C "$go_dir" --strip-components=1
+            rm "/tmp/go${go_version}.tar.gz"
+            echo "✅ Go $go_version installé avec succès"
+        else
+            echo "❌ Erreur: Échec du téléchargement de Go"
+            return 1
+        fi
+    else
+        echo "ℹ️ Go déjà installé"
+    fi
+    
+    export PATH="$go_dir/bin:$PATH"
+    hash -r
+}
+
+# Installation et gestion des extensions VS Code (mode portable)
+VSCodeExtensionsInstall() {
+    local extensions_dir="$VSCODE_PORTABLE_EXTENSIONS"
+    local use_portable=false
+    
+    if ! command -v code >/dev/null 2>&1; then
+        echo "❌ VS Code n'est pas installé sur ce système"
+        return 1
+    fi
+    
+    echo "🔧 Configuration des extensions VS Code..."
+    echo "📋 Options disponibles :"
+    echo "  1. Installer dans l'environnement système (recommandé)"
+    echo "  2. Installer dans l'espace portable temporaire"
+    echo -n "Choisissez une option [1-2]: "
+    read -r choice
+    
+    case "$choice" in
+        "2")
+            use_portable=true
+            mkdir -p "$extensions_dir"
+            echo "📁 Mode portable activé: $extensions_dir"
+            ;;
+        *)
+            echo "📁 Mode système activé (configuration par défaut)"
+            ;;
+    esac
+    
+    # Extensions recommandées pour les étudiants 42
+    local recommended_extensions=(
+        "ms-vscode.cpptools"                    # C/C++ IntelliSense
+        "ms-python.python"                      # Python support
+        "rust-lang.rust-analyzer"               # Rust analyzer
+        "golang.go"                             # Go support
+        "redhat.java"                          # Java support
+        "ms-vscode.vscode-typescript-next"      # TypeScript
+        "bradlc.vscode-tailwindcss"            # Tailwind CSS
+        "esbenp.prettier-vscode"               # Code formatter
+        "ms-vscode.hexeditor"                  # Hex editor
+        "42Crunch.vscode-openapi"              # API development
+    )
+    
+    echo "📦 Installation des extensions recommandées..."
+    
+    for extension in "${recommended_extensions[@]}"; do
+        echo "Installing $extension..."
+        if [[ "$use_portable" == "true" ]]; then
+            code --extensions-dir "$extensions_dir" --install-extension "$extension" 2>/dev/null || \
+                echo "⚠️ Échec installation: $extension"
+        else
+            code --install-extension "$extension" 2>/dev/null || \
+                echo "⚠️ Échec installation: $extension"
+        fi
+    done
+    
+    if [[ "$use_portable" == "true" ]]; then
+        echo "✅ Extensions VS Code configurées dans $extensions_dir"
+        echo "💡 Pour utiliser ces extensions : code --extensions-dir \"$extensions_dir\""
+        echo "🔧 Ajoutez cet alias : alias code-portable='code --extensions-dir \"$extensions_dir\"'"
+    else
+        echo "✅ Extensions VS Code installées dans l'environnement système"
+        echo "💡 Extensions disponibles immédiatement dans VS Code"
+    fi
+}
+
+# Installation Poetry pour Python
+PoetryInstall() {
+    echo "🐍 Installation de Poetry dans l'espace utilisateur..."
+    
+    if [[ ! -f "$POETRY_HOME/bin/poetry" ]]; then
+        mkdir -p "$POETRY_HOME"
+        
+        echo "📥 Téléchargement de Poetry..."
+        curl -sSL https://install.python-poetry.org | POETRY_HOME="$POETRY_HOME" python3 -
+        
+        echo "✅ Poetry installé dans $POETRY_HOME"
+        echo "💡 Ajoutez $POETRY_HOME/bin au PATH pour utiliser poetry"
+    else
+        echo "ℹ️ Poetry déjà installé dans $POETRY_HOME"
+    fi
+    
+    # Mise à jour du PATH
+    export PATH="$POETRY_HOME/bin:$PATH"
+    hash -r
+}
+
+# Fonction de setup IDE (non-invasive)
+SetupIDEEnvironment() {
+    echo "🛠️ Configuration de l'environnement IDE (préservation des paramètres existants)..."
+    
+    # Création des répertoires de configuration portable
+    mkdir -p "$VSCODE_PORTABLE_EXTENSIONS" "$IDEA_PORTABLE_HOME" 
+    
+    # Configuration VS Code portable (optionnelle)
+    local portable_vscode_config="$STUDENT_WORKSPACE/.config/Code/User"
+    mkdir -p "$portable_vscode_config"
+    
+    # Création d'un settings.json basique pour l'environnement portable uniquement
+    if [[ ! -f "$portable_vscode_config/settings.json" ]]; then
+        cat > "$portable_vscode_config/settings.json" << 'EOF'
+{
+    "editor.tabSize": 4,
+    "editor.insertSpaces": false,
+    "editor.detectIndentation": true,
+    "files.trimTrailingWhitespace": true,
+    "files.insertFinalNewline": true,
+    "C_Cpp.default.cStandard": "c99",
+    "C_Cpp.default.cppStandard": "c++98",
+    "editor.rulers": [80],
+    "workbench.colorTheme": "Default Dark+",
+    "extensions.autoUpdate": false
+}
+EOF
+        echo "✅ Configuration VS Code portable créée dans $portable_vscode_config"
+        echo "💡 Cette configuration n'affecte PAS votre VS Code principal"
+    fi
+    
+    # Créer des alias pour l'environnement portable
+    echo "🔧 Création des alias pour l'environnement portable..."
+    
+    # Vérification si les alias existent déjà
+    if ! alias code-portable >/dev/null 2>&1; then
+        alias code-portable='code --extensions-dir "$VSCODE_PORTABLE_EXTENSIONS" --user-data-dir "$STUDENT_WORKSPACE/.config/Code"'
+        echo "✅ Alias 'code-portable' créé"
+    fi
+    
+    echo "✅ Environnement IDE configuré (mode non-invasif)"
+    echo "📋 Commandes disponibles :"
+    echo "   • code          : VS Code normal (vos paramètres actuels)"
+    echo "   • code-portable : VS Code avec environnement temporaire"
+}
+
+# Fonction étendue DevInstall avec support IDE
+DevInstall() {
+    local tool="$1"
+    
+    case "$tool" in
+        "java")
+            JavaInstall "${2:-17}"
+            ;;
+        "android")
+            AndroidSDKInstall "$2"
+            ;;
+        "rust")
+            RustInstall
+            ;;
+        "go")
+            GoInstall "$2"
+            ;;
+        "poetry")
+            PoetryInstall
+            ;;
+        "vscode-ext")
+            VSCodeExtensionsInstall
+            ;;
+        "ide")
+            SetupIDEEnvironment
+            ;;
+        "all")
+            echo "🚀 Installation complète des outils de développement..."
+            JavaInstall
+            AndroidSDKInstall
+            RustInstall  
+            GoInstall
+            PoetryInstall
+            SetupIDEEnvironment
+            echo "✅ Installation terminée. Redémarrez votre terminal."
+            ;;
+        *)
+            echo "Usage: DevInstall {java|android|rust|go|poetry|vscode-ext|ide|all} [version]"
+            echo "Exemples:"
+            echo "  DevInstall java 11"
+            echo "  DevInstall android"
+            echo "  DevInstall poetry"
+            echo "  DevInstall vscode-ext"
+            echo "  DevInstall ide"
+            echo "  DevInstall all"
+            ;;
+    esac
+}
+
+# Aliases supplémentaires pour les nouveaux outils
+alias install_poetry='DevInstall poetry'
+alias install_vscode_ext='DevInstall vscode-ext'
+alias setup_ide='DevInstall ide'
+
+# Fonction de diagnostic de l'environnement VS Code
+VSCodeEnvironmentCheck() {
+    echo "🔍 Diagnostic de l'environnement VS Code..."
+    echo ""
+    
+    # Vérification VS Code installé
+    if command -v code >/dev/null 2>&1; then
+        echo "✅ VS Code installé : $(code --version | head -n1)"
+    else
+        echo "❌ VS Code non installé"
+        return 1
+    fi
+    
+    echo ""
+    echo "📂 Emplacements des configurations :"
+    
+    # Configuration système par défaut
+    local system_extensions="$HOME/.vscode/extensions"
+    local system_config="$HOME/.config/Code"
+    
+    if [[ -d "$system_extensions" ]]; then
+        local ext_count=$(ls "$system_extensions" 2>/dev/null | wc -l)
+        echo "   🏠 Extensions système : $system_extensions ($ext_count extensions)"
+    else
+        echo "   🏠 Extensions système : Non trouvées"
+    fi
+    
+    if [[ -d "$system_config" ]]; then
+        echo "   🏠 Config système     : $system_config"
+        if [[ -f "$system_config/User/settings.json" ]]; then
+            echo "       └─ settings.json existant"
+        fi
+    else
+        echo "   🏠 Config système     : Non trouvée"
+    fi
+    
+    echo ""
+    echo "   📦 Extensions portables: $VSCODE_PORTABLE_EXTENSIONS"
+    if [[ -d "$VSCODE_PORTABLE_EXTENSIONS" ]]; then
+        local portable_ext_count=$(ls "$VSCODE_PORTABLE_EXTENSIONS" 2>/dev/null | wc -l)
+        echo "       └─ ($portable_ext_count extensions portables)"
+    else
+        echo "       └─ (non initialisé)"
+    fi
+    
+    echo ""
+    echo "⚙️  Variables d'environnement actuelles :"
+    echo "   XDG_CONFIG_HOME = ${XDG_CONFIG_HOME:-'<non défini>'}"
+    echo "   XDG_DATA_HOME   = ${XDG_DATA_HOME:-'<non défini>'}"
+    
+    echo ""
+    echo "🎯 Recommandations :"
+    echo "   • Utilisez 'code' pour votre environnement normal"
+    echo "   • Utilisez 'code-portable' pour l'environnement temporaire"
+    echo "   • Vos paramètres actuels sont préservés"
+}
+
+# Alias de diagnostic
+alias vscode-check='VSCodeEnvironmentCheck'
+alias check-vscode='VSCodeEnvironmentCheck'

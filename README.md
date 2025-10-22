@@ -16,11 +16,20 @@ Ce projet fournit une configuration ZSH complète avec Oh-My-Zsh, le thème Agno
 ### ⚡ Améliorations récentes
 
 - ✅ **Installation plugins externes** : `zsh-autosuggestions` et `zsh-syntax-highlighting` installés automatiquement
-- ✅ **Setup synchrone intelligent** : Mode synchrone par défaut pour première installation garantissant la prise en compte des variables d'environnement
-- ✅ **PATH Homebrew corrigé** : Accès automatique aux commandes `brew` dès l'installation
-- ✅ **Variables d'environnement complètes** : Configuration robuste et cohérente
-- ✅ **Setup asynchrone adaptatif** : Démarrage du shell plus rapide après configuration initiale
-- ✅ **Gestion d'erreurs améliorée** : Plus de stabilité et détection automatique première installation
+- ✅ **Support multi-langages** : Java, Android SDK, Rust, Go, Python/Poetry avec installation automatique
+- ✅ **Protection des configurations** : Variables conditionnelles pour préserver vos configurations existantes
+- ✅ **Diagnostic environnement** : Fonction `env_diagnostic` pour analyser l'impact sur votre système
+- ✅ **Modes de sécurité** : Choix entre mode sécurisé (sans impact) et mode portable complet
+- ✅ **Documentation complète** : Guides détaillés pour tous les outils et scénarios de récupération
+
+### 🛡️ **IMPORTANT - Sécurité des Configurations**
+
+⚠️ **Cette configuration peut affecter vos configurations existantes.** Consultez [ENVIRONMENT_SAFETY.md](docs/ENVIRONMENT_SAFETY.md) avant utilisation.
+
+**Modes disponibles :**
+- 🟢 **Mode Sécurisé** (recommandé) : `safe_setup` - Aucun impact sur vos configurations
+- 🟡 **Mode Portable** (avancé) : `portable_setup` - Isolation complète avec confirmation
+- 🔍 **Diagnostic** : `env_diagnostic` - Analyse l'impact sur votre système
 
 ## 📑 Fonctionnalités principales
 
@@ -44,9 +53,11 @@ Ce projet fournit une configuration ZSH complète avec Oh-My-Zsh, le thème Agno
 
 - 📁 **STmp** : Workspace temporaire avec VS Code (`STmp [chemin]`)
 - 🍺 **Homebrew intelligent** : Installation et configuration automatique dans l'espace utilisateur dédié
-- 🐍 **Python optimisé** : Cache et environnement utilisateur dans l'espace de travail personnel
+- �️ **Protection configurations** : Variables conditionnelles préservant vos paramètres existants
+- 🔧 **Outils modernes** : Support Java, Android, Rust, Go, Python avec installation automatique
 - 🔒 **Isolation utilisateur** : Chaque utilisateur dispose de son propre espace temporaire sécurisé
 - 📊 **Logs configurables** : 5 niveaux de verbosité (0=silencieux, 4=debug)
+- 🎛️ **Contrôle granulaire** : Variables de contrôle pour activer/désactiver chaque fonctionnalité
 
 **🎨 Interface et productivité :**
 
@@ -61,9 +72,14 @@ Ce projet fournit une configuration ZSH complète avec Oh-My-Zsh, le thème Agno
 - 📏 **Norminette Python** : Configuration automatique de flake8 (`PyNormInstall`)
 - 🎨 **C Formatter 42** : Installation automatique de c_formatter_42 pour VS Code (`c_formatter_42_pipInstall`)
 - 📚 **Node.js portable** : Installation automatique de Node.js et npm sans sudo (`NodeInstall`)
+- ☕ **Java complet** : Installation OpenJDK, Maven, Gradle dans l'espace utilisateur (`DevInstall java`)
+- 🤖 **Android SDK** : Outils de développement Android sans Android Studio (`DevInstall android`)
+- 🦀 **Rust moderne** : Compilateur Rust et Cargo pour développement système (`DevInstall rust`)
+- 🐹 **Go rapide** : Langage Go avec modules et outils intégrés (`DevInstall go`)
 - 🔄 **rlwrap intelligent** : Installation et utilisation automatique via Homebrew
 - 📤 **Git workflow** : Fonction `GF` pour add/commit/push en une commande
 - 🧹 **Nettoyage navigateurs** : Déblocage Chrome/Brave (`GoC`, `BrC`)
+- 🧼 **Nettoyage dev** : Gestion intelligente des caches et espaces (`cleanup_dev`)
 
 **⚙️ Variables d'environnement :**
 
@@ -105,11 +121,20 @@ x     # Clear terminal
 ```bash
 GF "message"                    # Git add + commit + push
 NodeInstall                     # Installer Node.js et npm sans sudo
+DevInstall java                 # Installer Java OpenJDK
+DevInstall android              # Installer Android SDK
+DevInstall rust                 # Installer Rust et Cargo
+DevInstall go                   # Installer Go
+DevInstall poetry               # Installer Poetry pour Python
+DevInstall vscode-ext           # Installer extensions VS Code recommandées
+DevInstall ide                  # Configurer environnement IDE complet
+DevInstall all                  # Installer tous les outils de développement
 PyNormInstall                   # Installer norminette (flake8) pour Python
 c_formatter_42_pipInstall       # Installer c_formatter_42 pour VS Code 42 C-Format
 discord                         # Télécharger et lancer Discord automatiquement
 STmp                           # Ouvrir dossier temporaire dans VS Code
 Wcc                            # Compiler avec gcc -Wall -Wextra -Werror
+cleanup_dev                     # Nettoyer l'espace de développement
 ```
 
 ### Contrôle de l'environnement
@@ -118,7 +143,12 @@ Wcc                            # Compiler avec gcc -Wall -Wextra -Werror
 setup_status   # Afficher l'état de la configuration
 log_debug      # Mode debug complet
 log_silent     # Mode silencieux
+vscode-check   # Diagnostic environnement VS Code (important !)
 ```
+
+### ⚠️ Note Importante : VS Code
+
+**Avant d'utiliser les fonctions VS Code**, exécutez `vscode-check` pour vérifier que vos paramètres existants sont préservés. Le script utilise un mode non-invasif qui protège votre configuration actuelle. [Voir la documentation détaillée](docs/VSCODE_IMPACT.md).
 
 ## 📚 Documentation détaillée
 
@@ -126,6 +156,8 @@ Pour aller plus loin, consultez nos guides spécialisés :
 
 - **[Configuration avancée](docs/CONFIGURATION.md)** - Variables d'environnement, personnalisation
 - **[Espace Utilisateur](docs/USER_WORKSPACE.md)** - Système d'isolation utilisateur et espace de travail dynamique
+- **[⚠️ Impact VS Code](docs/VSCODE_IMPACT.md)** - Important : Préservation de votre environnement VS Code existant
+- **[Outils de Développement](docs/DEVELOPMENT_TOOLS.md)** - Java, Android SDK, Rust, Go et autres outils modernes
 - **[Optimisation](docs/OPTIMIZATION.md)** - Stratégies d'économie d'espace, architecture temporaire
 - **[Fonctionnalités](docs/FEATURES.md)** - Guide complet des fonctions et aliases
 - **[Node.js et npm](docs/NODEJS.md)** - Installation et gestion Node.js sans sudo
