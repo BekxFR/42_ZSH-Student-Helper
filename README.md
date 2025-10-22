@@ -3,12 +3,13 @@
 ## 🎯 Qu'est-ce que c'est ?
 
 Un environnement ZSH optimisé pour les étudiants de l'école 42, conçu pour maximiser la productivité tout en respectant les contraintes de stockage strict (5GB).  
-Ce projet fournit une configuration ZSH complète avec Oh-My-Zsh, le thème Agnoster, et un système d'optimisation intelligent utilisant /tmp/tmp pour économiser l'espace sur la session utilisateur.
+Ce projet fournit une configuration ZSH complète avec Oh-My-Zsh, le thème Agnoster, et un système d'optimisation intelligent utilisant un espace de travail utilisateur dynamique `/tmp/tmp/USERNAME` pour économiser l'espace sur la session utilisateur tout en évitant les collisions entre utilisateurs.
 
 ### ✨ Caractéristiques principales
 
 - **Installation automatique** : Un seul script pour tout configurer
-- **Optimisation espace** : Utilise `/tmp/tmp` pour économiser l'espace sur la session utilisateur
+- **Optimisation espace** : Utilise un espace de travail utilisateur dynamique `/tmp/tmp/USERNAME` pour économiser l'espace et éviter les collisions
+- **Isolation utilisateur** : Chaque utilisateur dispose de son propre environnement temporaire sécurisé
 - **Setup intelligent** : Configuration automatique de Homebrew et des outils essentiels
 - **Prêt à l'emploi** : Aliases et fonctions pratiques pour le développement
 
@@ -42,8 +43,9 @@ Ce projet fournit une configuration ZSH complète avec Oh-My-Zsh, le thème Agno
 **🏗️ Infrastructure et optimisation :**
 
 - 📁 **STmp** : Workspace temporaire avec VS Code (`STmp [chemin]`)
-- 🍺 **Homebrew intelligent** : Installation et configuration automatique dans `/tmp/tmp`
-- 🐍 **Python optimisé** : Cache et environnement utilisateur dans `/tmp/tmp`
+- 🍺 **Homebrew intelligent** : Installation et configuration automatique dans l'espace utilisateur dédié
+- 🐍 **Python optimisé** : Cache et environnement utilisateur dans l'espace de travail personnel
+- 🔒 **Isolation utilisateur** : Chaque utilisateur dispose de son propre espace temporaire sécurisé
 - 📊 **Logs configurables** : 5 niveaux de verbosité (0=silencieux, 4=debug)
 
 **🎨 Interface et productivité :**
@@ -123,7 +125,8 @@ log_silent     # Mode silencieux
 Pour aller plus loin, consultez nos guides spécialisés :
 
 - **[Configuration avancée](docs/CONFIGURATION.md)** - Variables d'environnement, personnalisation
-- **[Optimisation](docs/OPTIMIZATION.md)** - Stratégies d'économie d'espace, architecture `/tmp/tmp`
+- **[Espace Utilisateur](docs/USER_WORKSPACE.md)** - Système d'isolation utilisateur et espace de travail dynamique
+- **[Optimisation](docs/OPTIMIZATION.md)** - Stratégies d'économie d'espace, architecture temporaire
 - **[Fonctionnalités](docs/FEATURES.md)** - Guide complet des fonctions et aliases
 - **[Node.js et npm](docs/NODEJS.md)** - Installation et gestion Node.js sans sudo
 - **[Discord Portable](docs/DISCORD.md)** - Installation et utilisation de Discord portable

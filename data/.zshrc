@@ -124,9 +124,11 @@ export AUTO_INSTALL_BREW=${AUTO_INSTALL_BREW:-1}  # Valeur par défaut: installa
 export ASYNC_SETUP=${ASYNC_SETUP:-0}  # Valeur par défaut: setup synchrone pour première installation
 export DISABLE_SETUP=${DISABLE_SETUP:-0}  # Valeur par défaut: setup automatique activé
 
-# Configuration Node.js et npm dans /tmp/tmp (sans sudo)
-export N_PREFIX="/tmp/tmp/node"
-export PATH="/tmp/tmp/node/bin:/tmp/tmp/npm-global/bin:$PATH"
+# Configuration Node.js et npm dans /tmp/tmp/USERNAME (sans sudo)
+# Dynamic user workspace - more secure and collision-resistant
+export STUDENT_WORKSPACE="/tmp/tmp/${USER:-$(whoami)}"
+export N_PREFIX="$STUDENT_WORKSPACE/node"
+export PATH="$STUDENT_WORKSPACE/node/bin:$STUDENT_WORKSPACE/npm-global/bin:$PATH"
 
 # Fonctions de logging
 logs_error() {
@@ -231,10 +233,28 @@ build_prompt() {
 
 # setup environnement functions
 setup_temp_directories() {
-    local base_dir="/tmp/tmp"
-    local dirs=("$base_dir" "$base_dir/.cache" "$base_dir/homebrew" "$base_dir/homebrew/bin")
+    # Dynamic user-specific workspace with intelligent fallback
+    local username="${USER:-$(whoami)}"
+    local base_dir="/tmp/tmp/${username}"
+    local fallback_dir="/tmp/tmp"
+    local selected_dir=""
     
-    logs_debug "Création des répertoires temporaires..."
+    logs_debug "Configuration de l'espace de travail pour l'utilisateur: $username"
+    
+    if mkdir -p "$base_dir" 2>/dev/null && [[ -w "$base_dir" ]]; then
+        selected_dir="$base_dir"
+        logs_debug "Répertoire utilisateur créé: $selected_dir"
+    else
+        logs_warning "Impossible de créer le répertoire utilisateur, fallback vers le répertoire partagé"
+        selected_dir="$fallback_dir"
+        mkdir -p "$selected_dir" 2>/dev/null
+    fi
+    
+    export STUDENT_WORKSPACE="$selected_dir"
+    
+    local dirs=("$selected_dir" "$selected_dir/.cache" "$selected_dir/homebrew" "$selected_dir/homebrew/bin")
+    
+    logs_debug "Création des répertoires temporaires dans: $selected_dir"
     
     for dir in "${dirs[@]}"; do
         if [[ ! -d "$dir" ]]; then
@@ -246,27 +266,28 @@ setup_temp_directories() {
         fi
     done
     
-    if [[ ! -w "$base_dir" ]]; then
-        logs_error "Pas de permission d'écriture sur $base_dir"
+    if [[ ! -w "$selected_dir" ]]; then
+        logs_error "Pas de permission d'écriture sur $selected_dir"
         return 1
     fi
     
-    logs_debug "Répertoires temporaires configurés avec succès"
+    logs_debug "Répertoires temporaires configurés avec succès dans: $selected_dir"
     return 0
 }
 
 setup_environment() {
-    local cache_dir="/tmp/tmp/.cache"
-    local homebrew_dir="/tmp/tmp/homebrew"
+    # Use dynamic workspace path
+    local cache_dir="${STUDENT_WORKSPACE}/.cache"
+    local homebrew_dir="${STUDENT_WORKSPACE}/homebrew"
     
-    logs_debug "Configuration de l'environnement..."
+    logs_debug "Configuration de l'environnement dans: $STUDENT_WORKSPACE"
     
     # Configuration du cache XDG (standard système)
     if [[ -d "$cache_dir" ]]; then
         export XDG_CACHE_HOME="$cache_dir"
         export PYTHONPATH="$cache_dir:$PYTHONPATH"
-        export PYTHONUSERBASE="/tmp/tmp"
-        export PATH="/tmp/tmp/bin:$PATH"
+        export PYTHONUSERBASE="$STUDENT_WORKSPACE"
+        export PATH="$STUDENT_WORKSPACE/bin:$PATH"
         logs_debug "Configuration Python/XDG terminée"
     else
         logs_warning "Répertoire cache non disponible: $cache_dir"
@@ -300,17 +321,18 @@ setup_environment() {
 }
 
 install_homebrew_if_needed() {
-    local brew_path="/tmp/tmp/homebrew/bin/brew"
+    local brew_path="${STUDENT_WORKSPACE}/homebrew/bin/brew"
     local installer_script="$HOME/42/42_ZSH_Scripts/BrewInstaller.sh"
     
     if [[ ! -f "$brew_path" ]]; then
         if [[ -f "$installer_script" && -x "$installer_script" ]]; then
-            logs_info "Installation de Homebrew en cours..."
+            logs_info "Installation de Homebrew en cours dans: $STUDENT_WORKSPACE"
             # Lancement silencieux en arrière-plan avec gestion d'erreur améliorée
             {
-                if zsh -c "$installer_script" >/dev/null 2>&1; then
-                    export PATH="/tmp/tmp/homebrew/bin:$PATH"
-                    logs_success "Homebrew installé avec succès!" >/dev/null 2>&1
+                STUDENT_WORKSPACE="$STUDENT_WORKSPACE" zsh -c "$installer_script" >/dev/null 2>&1
+                if [[ $? -eq 0 ]]; then
+                    export PATH="${STUDENT_WORKSPACE}/homebrew/bin:$PATH"
+                    logs_success "Homebrew installé avec succès dans $STUDENT_WORKSPACE!" >/dev/null 2>&1
                 else
                     logs_error "Échec de l'installation de Homebrew" >/dev/null 2>&1
                 fi
@@ -323,13 +345,14 @@ install_homebrew_if_needed() {
             fi
         fi
     else
-        logs_debug "Homebrew déjà installé"
+        logs_debug "Homebrew déjà installé dans $STUDENT_WORKSPACE"
     fi
 }
 
 setup_norminette_alias() {
     local flake8_locations=(
-        "/tmp/tmp/bin/flake8"                              # Installation temporaire
+        "${STUDENT_WORKSPACE}/bin/flake8"                  # Installation temporaire utilisateur
+        "/tmp/tmp/bin/flake8"                              # Installation temporaire legacy
         "/mnt/nfs/homes/chillion/.local/bin/flake8"        # Installation user classique
         "$(command -v flake8 2>/dev/null)"                 # PATH système
     )
@@ -376,8 +399,8 @@ setup_42zsh_environment() {
     local force_sync=0
     
     if [[ ! -d "/tmp/tmp" ]] || \
-       [[ "${AUTO_INSTALL_BREW:-1}" == "1" && ! -x "/tmp/tmp/homebrew/bin/brew" ]] || \
-       [[ "$PATH" != *"/tmp/tmp/homebrew/bin"* ]]; then
+       [[ "${AUTO_INSTALL_BREW:-1}" == "1" && ! -x "${STUDENT_WORKSPACE}/homebrew/bin/brew" ]] || \
+       [[ "$PATH" != *"${STUDENT_WORKSPACE}/homebrew/bin"* ]]; then
         force_sync=1
         logs_debug "Première installation détectée - mode synchrone forcé"
     fi
@@ -503,7 +526,7 @@ STmp() {
     
     # Définir le répertoire cible
     if [ $# -eq 0 ]; then
-        target_dir="/tmp/tmp"
+        target_dir="${STUDENT_WORKSPACE:-/tmp/tmp}"
     else
         target_dir="$1"
     fi
@@ -611,7 +634,7 @@ GF() {
 }
 
 discord() {
-    local DISCORD_DIR="/tmp/tmp/discord"
+    local DISCORD_DIR="${STUDENT_WORKSPACE}/discord"
     local DOWNLOAD_URL="https://discord.com/api/download?platform=linux&format=tar.gz"
     local VS_CODE_DETECTED=false
     local BASE_FLAGS=("--no-sandbox" "--disable-dev-shm-usage")
@@ -851,15 +874,16 @@ discord_test() {
     echo "📁 Vous êtes maintenant dans: $(pwd)"
 }
 
-# Installation automatique de Node.js et npm dans /tmp/tmp
+# Installation automatique de Node.js et npm dans l'espace utilisateur
 # Usage: NodeInstall [version] - par défaut installe la dernière version
 NodeInstall() {
     local node_version="${1:-latest}"
-    local npm_global_dir="/tmp/tmp/npm-global"
-    local node_dir="/tmp/tmp/node"
+    local npm_global_dir="${STUDENT_WORKSPACE}/npm-global"
+    local node_dir="${STUDENT_WORKSPACE}/node"
     local original_dir="$(pwd)"
     
-    echo "🚀 Installation de Node.js et npm dans /tmp/tmp..."
+    echo "🚀 Installation de Node.js et npm dans l'espace utilisateur..."
+    echo "📂 Répertoire de travail: $STUDENT_WORKSPACE"
     echo "📌 Version demandée: $node_version"
     
     # Création des répertoires nécessaires
