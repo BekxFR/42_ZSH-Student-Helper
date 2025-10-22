@@ -3,12 +3,12 @@
 # Script de test pour la sécurité des variables d'environnement
 # Usage: ./test_environment_safety.sh
 
-echo "🧪 TEST DE SÉCURITÉ DES VARIABLES D'ENVIRONNEMENT"
+echo "TEST DE SÉCURITÉ DES VARIABLES D'ENVIRONNEMENT"
 echo "=================================================="
 echo
 
 # Nettoyer l'environnement pour un test propre
-echo "🧹 Nettoyage de l'environnement pour test propre..."
+echo "Nettoyage de l'environnement pour test propre..."
 unset JAVA_HOME PYTHONUSERBASE PIP_USER
 unset XDG_CONFIG_HOME XDG_DATA_HOME XDG_CACHE_HOME
 unset VSCODE_PORTABLE_EXTENSIONS IDEA_HOME DOCKER_CONFIG
@@ -19,11 +19,11 @@ echo "   Environnement nettoyé"
 echo
 
 # Test 1: Configuration par défaut (mode sécurisé)
-echo "🟢 TEST 1: Configuration par défaut (mode sécurisé)"
+echo "TEST 1: Configuration par défaut (mode sécurisé)"
 echo "---------------------------------------------------"
 
-# Sourcer UNIQUEMENT le fichier enhanced dans un environnement propre
-source /tmp/tmp/42_ZSH-Student-Helper/data/.zshrc_enhanced
+# Sourcer UNIQUEMENT le fichier .zshrc principal dans un environnement propre
+source /tmp/tmp/42_ZSH-Student-Helper/data/.zshrc
 
 echo "Variables après sourcing (environnement propre):"
 echo "   JAVA_HOME: ${JAVA_HOME:-NON DÉFINI}"
@@ -65,13 +65,13 @@ fi
 echo
 
 # Test 2: Activation mode portable Java
-echo "🟡 TEST 2: Activation mode portable Java"
+echo "TEST 2: Activation mode portable Java"
 echo "----------------------------------------"
 
 # Reset et test avec activation
 unset JAVA_HOME
 export STUDENT_USE_PORTABLE_JAVA=1
-source /tmp/tmp/42_ZSH-Student-Helper/data/.zshrc_enhanced
+source /tmp/tmp/42_ZSH-Student-Helper/data/.zshrc
 
 echo "Variables après activation Java portable:"
 echo "   JAVA_HOME: ${JAVA_HOME:-NON DÉFINI}"
@@ -84,13 +84,13 @@ fi
 echo
 
 # Test 3: Test des variables XDG avec activation
-echo "� TEST 3: Variables XDG avec activation explicite"
+echo "TEST 3: Variables XDG avec activation explicite"
 echo "---------------------------------------------------"
 
 # Reset et test avec activation XDG
 unset XDG_CONFIG_HOME XDG_DATA_HOME XDG_CACHE_HOME
 export STUDENT_USE_PORTABLE_XDG=1
-source /tmp/tmp/42_ZSH-Student-Helper/data/.zshrc_enhanced
+source /tmp/tmp/42_ZSH-Student-Helper/data/.zshrc
 
 echo "Variables après activation XDG portable:"
 echo "   XDG_CONFIG_HOME: ${XDG_CONFIG_HOME:-NON DÉFINI}"
@@ -105,30 +105,30 @@ fi
 echo
 
 # Test 4: Test fonction de diagnostic
-echo "🔍 TEST 4: Fonction de diagnostic"
+echo "TEST 4: Fonction de diagnostic"
 echo "---------------------------------"
 
-if command -v EnvironmentDiagnostic >/dev/null 2>&1; then
-    echo "✅ Fonction EnvironmentDiagnostic disponible"
+if command -v EnvironmentSafetyCheck >/dev/null 2>&1; then
+    echo "✅ Fonction EnvironmentSafetyCheck disponible"
 else
-    echo "❌ Fonction EnvironmentDiagnostic non disponible"
+    echo "❌ Fonction EnvironmentSafetyCheck non disponible"
 fi
 
-if command -v SafeEnvironmentSetup >/dev/null 2>&1; then
-    echo "✅ Fonction SafeEnvironmentSetup disponible"  
+if command -v SafeMode >/dev/null 2>&1; then
+    echo "✅ Fonction SafeMode disponible"  
 else
-    echo "❌ Fonction SafeEnvironmentSetup non disponible"
+    echo "❌ Fonction SafeMode non disponible"
 fi
 
-if command -v PortableEnvironmentSetup >/dev/null 2>&1; then
-    echo "✅ Fonction PortableEnvironmentSetup disponible"
+if command -v safety_check >/dev/null 2>&1; then
+    echo "✅ Alias safety_check disponible"
 else
-    echo "❌ Fonction PortableEnvironmentSetup non disponible"
+    echo "❌ Alias safety_check non disponible"
 fi
 echo
 
 # Test 5: Variables toujours sûres
-echo "✅ TEST 5: Variables toujours sûres"
+echo "TEST 5: Variables toujours sûres"
 echo "-----------------------------------"
 
 SAFE_VARS=("CARGO_HOME" "RUSTUP_HOME" "GOPATH" "ANDROID_HOME" "N_PREFIX")
@@ -150,7 +150,7 @@ fi
 echo
 
 # Résumé final
-echo "📊 RÉSUMÉ DES TESTS"
+echo "RÉSUMÉ DES TESTS"
 echo "==================="
 
 if [[ "$SAFE_CONFIG" == "true" ]]; then
@@ -166,9 +166,9 @@ echo "✅ Variables sûres actives"
 echo
 
 if [[ "$SAFE_CONFIG" == "true" ]]; then
-    echo "🎉 TESTS DE SÉCURITÉ RÉUSSIS!"
+    echo "TESTS DE SÉCURITÉ RÉUSSIS!"
     echo "La configuration est sûre pour utilisation par défaut."
 else
-    echo "⚠️  ATTENTION: Problèmes de sécurité détectés!"
+    echo "ATTENTION: Problèmes de sécurité détectés!"
     echo "Vérifiez la configuration des variables conditionnelles."
 fi

@@ -27,6 +27,7 @@ Ce projet fournit une configuration ZSH complète avec Oh-My-Zsh, le thème Agno
 ⚠️ **Cette configuration peut affecter vos configurations existantes.** Consultez [ENVIRONMENT_SAFETY.md](docs/ENVIRONMENT_SAFETY.md) avant utilisation.
 
 **Modes disponibles :**
+
 - 🟢 **Mode Sécurisé** (recommandé) : `safe_setup` - Aucun impact sur vos configurations
 - 🟡 **Mode Portable** (avancé) : `portable_setup` - Isolation complète avec confirmation
 - 🔍 **Diagnostic** : `env_diagnostic` - Analyse l'impact sur votre système

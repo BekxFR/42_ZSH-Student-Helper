@@ -9,7 +9,7 @@ Ce document décrit les variables d'environnement qui peuvent **affecter vos con
 ```bash
 # CES VARIABLES AFFECTENT TOUTES LES APPLICATIONS!
 XDG_CONFIG_HOME="/tmp/tmp/USERNAME/.config"    # Redirection de ~/.config
-XDG_DATA_HOME="/tmp/tmp/USERNAME/.local/share" # Redirection de ~/.local/share  
+XDG_DATA_HOME="/tmp/tmp/USERNAME/.local/share" # Redirection de ~/.local/share
 XDG_CACHE_HOME="/tmp/tmp/USERNAME/.cache"      # Redirection de ~/.cache
 ```
 
@@ -23,7 +23,7 @@ XDG_CACHE_HOME="/tmp/tmp/USERNAME/.cache"      # Redirection de ~/.cache
 # Variables Java
 JAVA_HOME="/tmp/tmp/USERNAME/java"
 
-# Variables Python  
+# Variables Python
 PYTHONUSERBASE="/tmp/tmp/USERNAME"
 PIP_USER="1"
 
@@ -55,7 +55,7 @@ Utilisez ces variables pour activer/désactiver les fonctionnalités :
 ```bash
 # Contrôles disponibles (0=désactivé, 1=activé)
 export STUDENT_USE_PORTABLE_JAVA=0      # Java portable
-export STUDENT_USE_PORTABLE_PYTHON=0    # Python portable  
+export STUDENT_USE_PORTABLE_PYTHON=0    # Python portable
 export STUDENT_USE_PORTABLE_DOCKER=0    # Docker portable
 export STUDENT_USE_PORTABLE_VSCODE=0    # VS Code portable
 export STUDENT_USE_PORTABLE_IDEA=0      # IntelliJ portable
@@ -65,17 +65,21 @@ export STUDENT_USE_PORTABLE_XDG=0       # Variables XDG (DANGEREUX!)
 ### Modes de Configuration
 
 #### Mode Sécurisé (Recommandé)
+
 ```bash
 safe_setup
 ```
+
 - ✅ Préserve toutes vos configurations existantes
 - ✅ Active uniquement Node.js, Rust, Go, Android
 - ✅ Aucun risque de perte de configuration
 
 #### Mode Portable Complet (Avancé)
+
 ```bash
 portable_setup
 ```
+
 - ⚠️ Peut affecter vos configurations existantes
 - 🚀 Isole complètement votre environnement de développement
 - 🔄 Nécessite redémarrage du terminal
@@ -83,17 +87,20 @@ portable_setup
 ## 🔍 Diagnostic de l'Environnement
 
 ### Commande de Diagnostic
+
 ```bash
 env_diagnostic
 ```
 
 Cette commande affiche :
+
 - État de toutes les variables d'environnement
 - Niveau d'impact actuel
 - Avertissements de sécurité
 - Recommandations de configuration
 
 ### Exemple de Sortie
+
 ```
 === DIAGNOSTIC ENVIRONNEMENT DÉVELOPPEMENT ===
 
@@ -112,6 +119,7 @@ Cette commande affiche :
 ### Si vous avez perdu vos configurations
 
 #### 1. Configurations XDG perdues
+
 ```bash
 # Désactiver les variables XDG
 export STUDENT_USE_PORTABLE_XDG=0
@@ -123,6 +131,7 @@ exec zsh
 ```
 
 #### 2. Configuration Java/Python perdue
+
 ```bash
 # Désactiver Java portable
 export STUDENT_USE_PORTABLE_JAVA=0
@@ -133,6 +142,7 @@ exec zsh
 ```
 
 #### 3. Récupération complète
+
 ```bash
 # Retour aux paramètres système complets
 safe_setup
@@ -146,12 +156,13 @@ exec zsh
 Avant d'activer le mode portable complet :
 
 - [ ] **Sauvegarder** vos configurations importantes
-- [ ] **Tester** avec le mode sécurisé d'abord  
+- [ ] **Tester** avec le mode sécurisé d'abord
 - [ ] **Vérifier** quelles applications vous utilisez quotidiennement
 - [ ] **Comprendre** comment désactiver si nécessaire
 - [ ] **Documenter** vos variables d'environnement actuelles
 
 ### Sauvegarde Préventive
+
 ```bash
 # Sauvegarder les variables actuelles
 env | grep -E "(JAVA_HOME|PYTHON|XDG_|DOCKER_)" > ~/backup_env_vars.txt
@@ -164,6 +175,7 @@ cp -r ~/.local/share ~/.local/share.backup.$(date +%Y%m%d)
 ## 🔧 Configuration Recommandée
 
 ### Pour Débutants
+
 ```bash
 # Dans ~/.zshrc, ajoutez AVANT de sourcer la configuration 42
 export STUDENT_USE_PORTABLE_XDG=0       # Sécurité maximale
@@ -172,14 +184,16 @@ export STUDENT_USE_PORTABLE_PYTHON=0    # Utiliser Python système
 ```
 
 ### Pour Utilisateurs Avancés
+
 ```bash
 # Isolation complète avec contrôle
 export STUDENT_USE_PORTABLE_JAVA=1      # Java isolé
-export STUDENT_USE_PORTABLE_PYTHON=1    # Python isolé  
+export STUDENT_USE_PORTABLE_PYTHON=1    # Python isolé
 export STUDENT_USE_PORTABLE_XDG=0       # Garder XDG système (sécurité)
 ```
 
 ### Pour Développeurs Expérimentés
+
 ```bash
 # Isolation totale (testez d'abord!)
 portable_setup
