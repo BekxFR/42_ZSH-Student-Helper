@@ -130,9 +130,11 @@ export STUDENT_WORKSPACE="/tmp/tmp/${USER:-$(whoami)}"
 export N_PREFIX="$STUDENT_WORKSPACE/node"
 export PATH="$STUDENT_WORKSPACE/node/bin:$STUDENT_WORKSPACE/npm-global/bin:$PATH"
 
-# Configuration étendue pour outils de développement modernes
-# Java et outils JVM
-export JAVA_HOME="$STUDENT_WORKSPACE/java"
+# Configuration étendue pour outils de développement modernes (VERSION SÉCURISÉE)
+# Variables conditionnelles pour préserver les configurations existantes
+
+# Java et outils JVM (conditionnel pour préserver l'existant)
+[[ "$STUDENT_USE_PORTABLE_JAVA" == "1" ]] && export JAVA_HOME="$STUDENT_WORKSPACE/java"
 export MAVEN_HOME="$STUDENT_WORKSPACE/maven"
 export GRADLE_HOME="$STUDENT_WORKSPACE/gradle"
 export GRADLE_USER_HOME="$STUDENT_WORKSPACE/.gradle"
@@ -151,31 +153,36 @@ export GOPATH="$STUDENT_WORKSPACE/go"
 export GOCACHE="$STUDENT_WORKSPACE/.cache/go-build"
 export GOMODCACHE="$STUDENT_WORKSPACE/go/pkg/mod"
 
-# Docker (si supporté)
-export DOCKER_CONFIG="$STUDENT_WORKSPACE/.docker"
+# Configuration Docker (conditionnel si utilisable sans sudo)
+[[ "$STUDENT_USE_PORTABLE_DOCKER" == "1" ]] && export DOCKER_CONFIG="$STUDENT_WORKSPACE/.docker"
 
-# Configuration IDE et éditeurs - PRÉSERVATION DE L'ENVIRONNEMENT EXISTANT
-# Note: Ces variables sont optionnelles et n'écrasent pas la configuration système par défaut
-export VSCODE_PORTABLE_EXTENSIONS="$STUDENT_WORKSPACE/.vscode-extensions"
-export IDEA_PORTABLE_HOME="$STUDENT_WORKSPACE/.idea"
+# Configuration IDE et éditeurs - PRÉSERVATION DE L'ENVIRONNEMENT EXISTANT (VERSION SÉCURISÉE)
+# Ces variables sont optionnelles et conditionnelles
+[[ "$STUDENT_USE_PORTABLE_VSCODE" == "1" ]] && export VSCODE_PORTABLE_EXTENSIONS="$STUDENT_WORKSPACE/.vscode-extensions"
+[[ "$STUDENT_USE_PORTABLE_IDEA" == "1" ]] && export IDEA_PORTABLE_HOME="$STUDENT_WORKSPACE/.idea"
 
-# Configuration Python avancée
-export PIP_USER="1"
+# Configuration Python avancée (conditionnelle)
+[[ "$STUDENT_USE_PORTABLE_PYTHON" == "1" ]] && {
+    export PIP_USER="1"
+    export PYTHONUSERBASE="$STUDENT_WORKSPACE"
+}
 export POETRY_HOME="$STUDENT_WORKSPACE/.poetry"
 export CONDA_PKGS_DIRS="$STUDENT_WORKSPACE/.conda/pkgs"
 export CONDA_ENVS_PATH="$STUDENT_WORKSPACE/.conda/envs"
 
-# Configuration des caches génériques XDG (préservation de la config utilisateur)
-# Ces variables ne sont définies que si aucune configuration utilisateur n'existe
-if [[ -z "$XDG_CONFIG_HOME" ]]; then
+# Configuration des caches génériques XDG (CRITIQUE - PROTECTION MAXIMALE)
+# Ces variables ne sont définies que si explicitement demandées car elles affectent TOUTES les applications
+[[ "$STUDENT_USE_PORTABLE_XDG" == "1" ]] && {
     export XDG_CONFIG_HOME="$STUDENT_WORKSPACE/.config"
-fi
-if [[ -z "$XDG_DATA_HOME" ]]; then
     export XDG_DATA_HOME="$STUDENT_WORKSPACE/.local/share"
-fi
+    echo "⚠️  ATTENTION: Variables XDG portables activées - peuvent affecter toutes les applications"
+}
+# AUCUNE AUTRE DÉFINITION - Mode sécurisé strict
 
-# Mise à jour du PATH pour tous les outils
-export PATH="$JAVA_HOME/bin:$MAVEN_HOME/bin:$GRADLE_HOME/bin:$ANDROID_HOME/tools:$ANDROID_HOME/platform-tools:$CARGO_HOME/bin:$GOPATH/bin:$PATH"
+# Mise à jour du PATH pour tous les outils (conditionnel)
+PATH="$ANDROID_HOME/tools:$ANDROID_HOME/platform-tools:$CARGO_HOME/bin:$GOPATH/bin:$PATH"
+[[ -n "$JAVA_HOME" ]] && PATH="$JAVA_HOME/bin:$MAVEN_HOME/bin:$GRADLE_HOME/bin:$PATH"
+export PATH
 
 # Fonctions de logging
 logs_error() {
@@ -329,13 +336,14 @@ setup_environment() {
     
     logs_debug "Configuration de l'environnement dans: $STUDENT_WORKSPACE"
     
-    # Configuration du cache XDG (standard système)
+    # Configuration du cache XDG (standard système) - VERSION SÉCURISÉE
     if [[ -d "$cache_dir" ]]; then
-        export XDG_CACHE_HOME="$cache_dir"
+        # Configuration conditionnelle pour préserver l'environnement utilisateur
+        [[ "$STUDENT_USE_PORTABLE_XDG" == "1" ]] && export XDG_CACHE_HOME="$cache_dir"
         export PYTHONPATH="$cache_dir:$PYTHONPATH"
-        export PYTHONUSERBASE="$STUDENT_WORKSPACE"
+        [[ "$STUDENT_USE_PORTABLE_PYTHON" == "1" ]] && export PYTHONUSERBASE="$STUDENT_WORKSPACE"
         export PATH="$STUDENT_WORKSPACE/bin:$PATH"
-        logs_debug "Configuration Python/XDG terminée"
+        logs_debug "Configuration Python/XDG sécurisée terminée"
     else
         logs_warning "Répertoire cache non disponible: $cache_dir"
     fi
@@ -1393,3 +1401,75 @@ VSCodeEnvironmentCheck() {
 # Alias de diagnostic
 alias vscode-check='VSCodeEnvironmentCheck'
 alias check-vscode='VSCodeEnvironmentCheck'
+
+# =============================================================================
+# SYSTÈME DE SÉCURITÉ POUR LES VARIABLES D'ENVIRONNEMENT
+# =============================================================================
+
+# Variables de contrôle par défaut (mode sécurisé)
+export STUDENT_USE_PORTABLE_JAVA=${STUDENT_USE_PORTABLE_JAVA:-0}
+export STUDENT_USE_PORTABLE_PYTHON=${STUDENT_USE_PORTABLE_PYTHON:-0}
+export STUDENT_USE_PORTABLE_DOCKER=${STUDENT_USE_PORTABLE_DOCKER:-0}
+export STUDENT_USE_PORTABLE_VSCODE=${STUDENT_USE_PORTABLE_VSCODE:-0}
+export STUDENT_USE_PORTABLE_IDEA=${STUDENT_USE_PORTABLE_IDEA:-0}
+export STUDENT_USE_PORTABLE_XDG=${STUDENT_USE_PORTABLE_XDG:-0}
+
+# Fonction de diagnostic rapide
+EnvironmentSafetyCheck() {
+    echo "🛡️  DIAGNOSTIC SÉCURITÉ ENVIRONNEMENT"
+    echo "====================================="
+    
+    local warnings=0
+    
+    # Vérifier Java
+    if [[ -n "$JAVA_HOME" && "$JAVA_HOME" == *"/tmp/tmp"* && "${STUDENT_USE_PORTABLE_JAVA}" != "1" ]]; then
+        echo "⚠️  JAVA_HOME redéfini sans activation explicite"
+        ((warnings++))
+    fi
+    
+    # Vérifier Python
+    if [[ -n "$PYTHONUSERBASE" && "${STUDENT_USE_PORTABLE_PYTHON}" != "1" ]]; then
+        echo "⚠️  Python utilisateur redéfini sans activation explicite"
+        ((warnings++))
+    fi
+    
+    # Vérifier XDG (critique)
+    if [[ -n "$XDG_CONFIG_HOME" && "$XDG_CONFIG_HOME" == *"/tmp/tmp"* && "${STUDENT_USE_PORTABLE_XDG}" != "1" ]]; then
+        echo "🚨 XDG_CONFIG_HOME redéfini - IMPACT CRITIQUE sur toutes les applications!"
+        ((warnings+=3))
+    fi
+    
+    # Résumé
+    if [[ $warnings -eq 0 ]]; then
+        echo "✅ Configuration sécurisée - aucun impact sur vos paramètres existants"
+    else
+        echo "❌ $warnings avertissement(s) détecté(s)"
+        echo ""
+        echo "🔧 Pour corriger :"
+        echo "   safe_setup     # Mode sécurisé (recommandé)"
+        echo "   env_diagnostic # Diagnostic complet"
+    fi
+}
+
+# Mode sécurisé (désactive toutes les variables impactantes)
+SafeMode() {
+    export STUDENT_USE_PORTABLE_JAVA=0
+    export STUDENT_USE_PORTABLE_PYTHON=0
+    export STUDENT_USE_PORTABLE_DOCKER=0
+    export STUDENT_USE_PORTABLE_VSCODE=0
+    export STUDENT_USE_PORTABLE_IDEA=0
+    export STUDENT_USE_PORTABLE_XDG=0
+    
+    echo "🛡️  Mode sécurisé activé - aucun impact sur vos configurations existantes"
+    echo "🔄 Redémarrez votre terminal pour appliquer : exec zsh"
+}
+
+# Aliases de sécurité
+alias safety_check='EnvironmentSafetyCheck'
+alias safe_mode='SafeMode'
+alias env_safety='EnvironmentSafetyCheck'
+
+# Vérification automatique au démarrage (optionnelle)
+if [[ "${AUTO_SAFETY_CHECK:-0}" == "1" ]]; then
+    EnvironmentSafetyCheck
+fi
