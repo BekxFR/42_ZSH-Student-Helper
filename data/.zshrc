@@ -124,9 +124,9 @@ export AUTO_INSTALL_BREW=${AUTO_INSTALL_BREW:-1}  # Valeur par défaut: installa
 export ASYNC_SETUP=${ASYNC_SETUP:-0}  # Valeur par défaut: setup synchrone pour première installation
 export DISABLE_SETUP=${DISABLE_SETUP:-0}  # Valeur par défaut: setup automatique activé
 
-# Configuration Node.js et npm dans /tmp/tmp/USERNAME (sans sudo)
-# Dynamic user workspace - more secure and collision-resistant
-export STUDENT_WORKSPACE="/tmp/tmp/${USER:-$(whoami)}"
+# Configuration Node.js et npm dans /tmp/USERNAME (sans sudo)
+# Dynamic user workspace - accessible to all users
+export STUDENT_WORKSPACE="/tmp/${USER:-$(whoami)}"
 export N_PREFIX="$STUDENT_WORKSPACE/node"
 export PATH="$STUDENT_WORKSPACE/node/bin:$STUDENT_WORKSPACE/npm-global/bin:$PATH"
 
@@ -287,21 +287,24 @@ build_prompt() {
 
 # setup environnement functions
 setup_temp_directories() {
-    # Dynamic user-specific workspace with intelligent fallback
+    # Dynamic user-specific workspace with robust permission handling
     local username="${USER:-$(whoami)}"
-    local base_dir="/tmp/tmp/${username}"
-    local fallback_dir="/tmp/tmp"
+    local user_workspace="/tmp/${username}"
     local selected_dir=""
     
     logs_debug "Configuration de l'espace de travail pour l'utilisateur: $username"
     
-    if mkdir -p "$base_dir" 2>/dev/null && [[ -w "$base_dir" ]]; then
-        selected_dir="$base_dir"
+    # Tentative de création avec gestion des permissions
+    if mkdir -p "$user_workspace" 2>/dev/null && [[ -w "$user_workspace" ]]; then
+        selected_dir="$user_workspace"
         logs_debug "Répertoire utilisateur créé: $selected_dir"
+        
+        # Nettoyage des processus orphelins si nécessaire
+        cleanup_stale_processes "$selected_dir"
     else
-        logs_warning "Impossible de créer le répertoire utilisateur, fallback vers le répertoire partagé"
-        selected_dir="$fallback_dir"
-        mkdir -p "$selected_dir" 2>/dev/null
+        logs_error "Impossible de créer ou d'accéder au répertoire utilisateur: $user_workspace"
+        logs_error "Vérifiez les permissions sur /tmp"
+        return 1
     fi
     
     export STUDENT_WORKSPACE="$selected_dir"
@@ -327,6 +330,23 @@ setup_temp_directories() {
     
     logs_debug "Répertoires temporaires configurés avec succès dans: $selected_dir"
     return 0
+}
+
+# Fonction de nettoyage des processus orphelins
+cleanup_stale_processes() {
+    local workspace="$1"
+    local lock_file="$workspace/.workspace_lock"
+    
+    if [[ -f "$lock_file" ]]; then
+        local lock_pid=$(cat "$lock_file" 2>/dev/null)
+        if [[ -n "$lock_pid" ]] && ! kill -0 "$lock_pid" 2>/dev/null; then
+            logs_debug "Nettoyage du lock orphelin: PID $lock_pid"
+            rm -f "$lock_file"
+        fi
+    fi
+    
+    # Créer un nouveau lock
+    echo $$ > "$lock_file"
 }
 
 setup_environment() {

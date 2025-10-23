@@ -37,7 +37,7 @@ echo "   STUDENT_USE_PORTABLE_XDG: ${STUDENT_USE_PORTABLE_XDG:-0}"
 # Vérifications de sécurité
 SAFE_CONFIG=true
 
-if [[ -n "$JAVA_HOME" && "$JAVA_HOME" == *"/tmp/tmp/"* && "${STUDENT_USE_PORTABLE_JAVA:-0}" != "1" ]]; then
+if [[ -n "$JAVA_HOME" && "$JAVA_HOME" == *"/tmp/"* && "${STUDENT_USE_PORTABLE_JAVA:-0}" != "1" ]]; then
     echo "❌ ERREUR: JAVA_HOME modifié sans activation explicite!"
     SAFE_CONFIG=false
 fi
@@ -76,7 +76,7 @@ source /tmp/tmp/42_ZSH-Student-Helper/data/.zshrc
 echo "Variables après activation Java portable:"
 echo "   JAVA_HOME: ${JAVA_HOME:-NON DÉFINI}"
 
-if [[ "$JAVA_HOME" == *"/tmp/tmp/"* ]]; then
+if [[ "$JAVA_HOME" == *"/tmp/"* ]]; then
     echo "✅ Java portable activé correctement"
 else
     echo "❌ Java portable non activé"
@@ -136,7 +136,7 @@ ALL_SAFE=true
 
 for var in "${SAFE_VARS[@]}"; do
     value="${!var}"
-    if [[ -n "$value" && "$value" == *"/tmp/tmp/"* ]]; then
+    if [[ -n "$value" && "$value" == *"/tmp/"* ]]; then
         echo "✅ $var: $value (sûr)"
     else
         echo "❌ $var: ${value:-NON DÉFINI} (problème)"
