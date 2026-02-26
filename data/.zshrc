@@ -119,7 +119,7 @@ DEFAULT_USER=votre_nom
 # Configuration globale des logs
 # LOGLEVEL: 0=silencieux, 1=erreurs, 2=warnings+erreurs, 3=info+warnings+erreurs, 4=debug (tout)
 export LOGLEVEL=${LOGLEVEL:-0}  # Valeur par défaut: mode silencieux
-export PROMPTLEVEL=${PROMPTLEVEL:-0}  # Valeur par défaut: prompt long
+export PROMPTLEVEL=${PROMPTLEVEL:-1}  # Valeur par défaut: prompt long
 export AUTO_INSTALL_BREW=${AUTO_INSTALL_BREW:-1}  # Valeur par défaut: installation automatique de Homebrew activée
 export ASYNC_SETUP=${ASYNC_SETUP:-0}  # Valeur par défaut: setup synchrone pour première installation
 export DISABLE_SETUP=${DISABLE_SETUP:-0}  # Valeur par défaut: setup automatique activé
@@ -155,6 +155,9 @@ export GOMODCACHE="$STUDENT_WORKSPACE/go/pkg/mod"
 
 # Configuration Docker (conditionnel si utilisable sans sudo)
 [[ "$STUDENT_USE_PORTABLE_DOCKER" == "1" ]] && export DOCKER_CONFIG="$STUDENT_WORKSPACE/.docker"
+
+# Configuration Vagrant (boxes, plugins et téléchargements dans /tmp)
+[[ "$STUDENT_USE_PORTABLE_VAGRANT" == "1" ]] && export VAGRANT_HOME="$STUDENT_WORKSPACE/.vagrant.d"
 
 # Configuration IDE et éditeurs - PRÉSERVATION DE L'ENVIRONNEMENT EXISTANT (VERSION SÉCURISÉE)
 # Ces variables sont optionnelles et conditionnelles
@@ -236,6 +239,16 @@ alias brew_auto_install_off='export AUTO_INSTALL_BREW=0 && echo "🚫 Installati
 alias brew_auto_install_on='export AUTO_INSTALL_BREW=1 && echo "✅ Installation automatique de Homebrew activée"'
 alias setup_status='echo "📊 ASYNC_SETUP: ${ASYNC_SETUP:-0}, AUTO_INSTALL_BREW: ${AUTO_INSTALL_BREW:-1}, DISABLE_SETUP: ${DISABLE_SETUP:-0}"'
 
+# Contrôle Docker portable
+alias docker_on='export STUDENT_USE_PORTABLE_DOCKER=1 && export DOCKER_CONFIG="$STUDENT_WORKSPACE/.docker" && mkdir -p "$DOCKER_CONFIG" && echo "🐳 Docker portable activé (DOCKER_CONFIG=$DOCKER_CONFIG)"'
+alias docker_off='export STUDENT_USE_PORTABLE_DOCKER=0 && unset DOCKER_CONFIG && echo "🐳 Docker portable désactivé (DOCKER_CONFIG par défaut)"'
+alias docker_status='echo "🐳 Docker portable : ${STUDENT_USE_PORTABLE_DOCKER:-0} $([ "${STUDENT_USE_PORTABLE_DOCKER:-0}" = "1" ] && echo "✅ DOCKER_CONFIG=$DOCKER_CONFIG" || echo "❌ (défaut: ~/.docker)")"'
+
+# Contrôle Vagrant portable
+alias vagrant_on='export STUDENT_USE_PORTABLE_VAGRANT=1 && export VAGRANT_HOME="$STUDENT_WORKSPACE/.vagrant.d" && mkdir -p "$VAGRANT_HOME" && echo "📦 Vagrant portable activé (VAGRANT_HOME=$VAGRANT_HOME)"'
+alias vagrant_off='export STUDENT_USE_PORTABLE_VAGRANT=0 && unset VAGRANT_HOME && echo "📦 Vagrant portable désactivé (VAGRANT_HOME par défaut)"'
+alias vagrant_status='echo "📦 Vagrant portable : ${STUDENT_USE_PORTABLE_VAGRANT:-0} $([ "${STUDENT_USE_PORTABLE_VAGRANT:-0}" = "1" ] && echo "✅ VAGRANT_HOME=$VAGRANT_HOME" || echo "❌ (défaut: ~/.vagrant.d)")"'
+
 if [[ -f "$HOME/42/42_ZSH_Scripts/BrewInstaller.sh" ]]; then
     alias IBrew="$HOME/42/42_ZSH_Scripts/BrewInstaller.sh"
 else
@@ -272,7 +285,7 @@ build_prompt() {
   prompt_status
   prompt_virtualenv
   prompt_aws
-  if [[ $PROMPTLEVEL == 0 ]]; then 
+  if [[ $PROMPTLEVEL == 1 ]]; then 
     prompt_historyline
     prompt_time
   fi
@@ -1430,6 +1443,7 @@ alias check-vscode='VSCodeEnvironmentCheck'
 export STUDENT_USE_PORTABLE_JAVA=${STUDENT_USE_PORTABLE_JAVA:-0}
 export STUDENT_USE_PORTABLE_PYTHON=${STUDENT_USE_PORTABLE_PYTHON:-0}
 export STUDENT_USE_PORTABLE_DOCKER=${STUDENT_USE_PORTABLE_DOCKER:-0}
+export STUDENT_USE_PORTABLE_VAGRANT=${STUDENT_USE_PORTABLE_VAGRANT:-0}
 export STUDENT_USE_PORTABLE_VSCODE=${STUDENT_USE_PORTABLE_VSCODE:-0}
 export STUDENT_USE_PORTABLE_IDEA=${STUDENT_USE_PORTABLE_IDEA:-0}
 export STUDENT_USE_PORTABLE_XDG=${STUDENT_USE_PORTABLE_XDG:-0}
@@ -1476,10 +1490,11 @@ SafeMode() {
     export STUDENT_USE_PORTABLE_JAVA=0
     export STUDENT_USE_PORTABLE_PYTHON=0
     export STUDENT_USE_PORTABLE_DOCKER=0
+    export STUDENT_USE_PORTABLE_VAGRANT=0
     export STUDENT_USE_PORTABLE_VSCODE=0
     export STUDENT_USE_PORTABLE_IDEA=0
     export STUDENT_USE_PORTABLE_XDG=0
-    
+
     echo "🛡️  Mode sécurisé activé - aucun impact sur vos configurations existantes"
     echo "🔄 Redémarrez votre terminal pour appliquer : exec zsh"
 }
@@ -1521,23 +1536,28 @@ ConfigurePortableEnvironment() {
     echo -n "3. Docker portable (DOCKER_CONFIG) [y/N]: "
     read -r docker_choice
     [[ "$docker_choice" =~ ^[Yy]$ ]] && export STUDENT_USE_PORTABLE_DOCKER=1 || export STUDENT_USE_PORTABLE_DOCKER=0
-    
+
+    # Vagrant
+    echo -n "4. Vagrant portable (VAGRANT_HOME) [y/N]: "
+    read -r vagrant_choice
+    [[ "$vagrant_choice" =~ ^[Yy]$ ]] && export STUDENT_USE_PORTABLE_VAGRANT=1 || export STUDENT_USE_PORTABLE_VAGRANT=0
+
     # VS Code
-    echo -n "4. VS Code portable (extensions) [y/N]: "
+    echo -n "5. VS Code portable (extensions) [y/N]: "
     read -r vscode_choice
     [[ "$vscode_choice" =~ ^[Yy]$ ]] && export STUDENT_USE_PORTABLE_VSCODE=1 || export STUDENT_USE_PORTABLE_VSCODE=0
-    
+
     # IntelliJ IDEA
-    echo -n "5. IntelliJ IDEA portable [y/N]: "
+    echo -n "6. IntelliJ IDEA portable [y/N]: "
     read -r idea_choice
     [[ "$idea_choice" =~ ^[Yy]$ ]] && export STUDENT_USE_PORTABLE_IDEA=1 || export STUDENT_USE_PORTABLE_IDEA=0
-    
+
     # XDG (CRITIQUE)
     echo ""
     echo "⚠️  ATTENTION: Variables XDG (IMPACT CRITIQUE)"
     echo "   Ceci affectera TOUTES les applications Linux qui utilisent les standards XDG"
     echo "   Applications concernées: Firefox, Chrome, LibreOffice, GNOME, KDE, etc."
-    echo -n "6. Variables XDG portables (XDG_CONFIG_HOME, XDG_DATA_HOME) [y/N]: "
+    echo -n "7. Variables XDG portables (XDG_CONFIG_HOME, XDG_DATA_HOME) [y/N]: "
     read -r xdg_choice
     [[ "$xdg_choice" =~ ^[Yy]$ ]] && export STUDENT_USE_PORTABLE_XDG=1 || export STUDENT_USE_PORTABLE_XDG=0
     
@@ -1546,6 +1566,7 @@ ConfigurePortableEnvironment() {
     echo "   Java portable    : ${STUDENT_USE_PORTABLE_JAVA}"
     echo "   Python portable  : ${STUDENT_USE_PORTABLE_PYTHON}"
     echo "   Docker portable  : ${STUDENT_USE_PORTABLE_DOCKER}"
+    echo "   Vagrant portable : ${STUDENT_USE_PORTABLE_VAGRANT}"
     echo "   VS Code portable : ${STUDENT_USE_PORTABLE_VSCODE}"
     echo "   IDEA portable    : ${STUDENT_USE_PORTABLE_IDEA}"
     echo "   XDG portable     : ${STUDENT_USE_PORTABLE_XDG}"
@@ -1568,6 +1589,7 @@ ConfigurePortableEnvironment() {
 export STUDENT_USE_PORTABLE_JAVA=${STUDENT_USE_PORTABLE_JAVA}
 export STUDENT_USE_PORTABLE_PYTHON=${STUDENT_USE_PORTABLE_PYTHON}
 export STUDENT_USE_PORTABLE_DOCKER=${STUDENT_USE_PORTABLE_DOCKER}
+export STUDENT_USE_PORTABLE_VAGRANT=${STUDENT_USE_PORTABLE_VAGRANT}
 export STUDENT_USE_PORTABLE_VSCODE=${STUDENT_USE_PORTABLE_VSCODE}
 export STUDENT_USE_PORTABLE_IDEA=${STUDENT_USE_PORTABLE_IDEA}
 export STUDENT_USE_PORTABLE_XDG=${STUDENT_USE_PORTABLE_XDG}
@@ -1634,6 +1656,7 @@ ShowPortableStatus() {
     echo "Java portable    : ${STUDENT_USE_PORTABLE_JAVA:-0} $([ "${STUDENT_USE_PORTABLE_JAVA:-0}" = "1" ] && echo "✅" || echo "❌")"
     echo "Python portable  : ${STUDENT_USE_PORTABLE_PYTHON:-0} $([ "${STUDENT_USE_PORTABLE_PYTHON:-0}" = "1" ] && echo "✅" || echo "❌")"
     echo "Docker portable  : ${STUDENT_USE_PORTABLE_DOCKER:-0} $([ "${STUDENT_USE_PORTABLE_DOCKER:-0}" = "1" ] && echo "✅" || echo "❌")"
+    echo "Vagrant portable : ${STUDENT_USE_PORTABLE_VAGRANT:-0} $([ "${STUDENT_USE_PORTABLE_VAGRANT:-0}" = "1" ] && echo "✅" || echo "❌")"
     echo "VS Code portable : ${STUDENT_USE_PORTABLE_VSCODE:-0} $([ "${STUDENT_USE_PORTABLE_VSCODE:-0}" = "1" ] && echo "✅" || echo "❌")"
     echo "IDEA portable    : ${STUDENT_USE_PORTABLE_IDEA:-0} $([ "${STUDENT_USE_PORTABLE_IDEA:-0}" = "1" ] && echo "✅" || echo "❌")"
     echo "XDG portable     : ${STUDENT_USE_PORTABLE_XDG:-0} $([ "${STUDENT_USE_PORTABLE_XDG:-0}" = "1" ] && echo "✅ ⚠️" || echo "❌")"
