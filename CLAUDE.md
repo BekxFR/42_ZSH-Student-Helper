@@ -26,12 +26,12 @@ There is no Makefile, CI/CD, linter, or build system.
 ### Core files
 
 - **`Deploy.sh`** — Main installer. Uses `set -euo pipefail`, trap-based rollback on ERR/SIGINT/SIGTERM, timestamped backups, logs to `/tmp/42_zsh_deploy.log`. Checks Ubuntu 20.04+ and Zsh 5.0.8+.
-- **`data/.zshrc`** (~1,650 lines) — The ZSH configuration deployed to `~/.zshrc`. Contains all runtime logic: environment setup, logging system, aliases, prompt customization, setup orchestration, and tool installer functions.
+- **`data/.zshrc`** (~1,700 lines) — The ZSH configuration deployed to `~/.zshrc`. Contains all runtime logic: environment setup, logging system, aliases, prompt customization, setup orchestration, and tool installer functions (including `ClaudeInstall()`).
 - **`scripts/BrewInstaller.sh`** — Lightweight Homebrew installer targeting `$STUDENT_WORKSPACE/homebrew`.
 
 ### Workspace model
 
-Each user gets an isolated workspace at `/tmp/USERNAME` (set via `STUDENT_WORKSPACE`). All portable tools (Homebrew, Node.js, Java, Rust, Go, Cargo, Poetry) install there, avoiding home directory quota consumption. The `/tmp` sticky bit (1777) prevents cross-user access.
+Each user gets an isolated workspace at `/tmp/USERNAME` (set via `STUDENT_WORKSPACE`). All portable tools (Homebrew, Node.js, Java, Rust, Go, Cargo, Poetry, Claude Code) install there, avoiding home directory quota consumption. The `/tmp` sticky bit (1777) prevents cross-user access. Claude Code uses symlinks (`~/.local/share/claude`, `~/.cache/claude`) to redirect its data transparently.
 
 ### Conditional activation pattern
 
@@ -39,7 +39,7 @@ Portable features are opt-in via flags. Nothing modifies the user environment un
 ```bash
 [[ "$STUDENT_USE_PORTABLE_JAVA" == "1" ]] && export JAVA_HOME="$STUDENT_WORKSPACE/java"
 ```
-Flags: `STUDENT_USE_PORTABLE_JAVA`, `_PYTHON`, `_DOCKER`, `_VSCODE`, `_IDEA`, `_XDG` (all default to 0).
+Flags: `STUDENT_USE_PORTABLE_JAVA`, `_PYTHON`, `_DOCKER`, `_VSCODE`, `_IDEA`, `_CLAUDE`, `_XDG` (all default to 0).
 
 ### Setup modes
 

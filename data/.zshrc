@@ -130,6 +130,9 @@ export STUDENT_WORKSPACE="/tmp/${USER:-$(whoami)}"
 export N_PREFIX="$STUDENT_WORKSPACE/node"
 export PATH="$STUDENT_WORKSPACE/node/bin:$STUDENT_WORKSPACE/npm-global/bin:$PATH"
 
+# Binaires utilisateur locaux (Claude Code, pip --user, etc.)
+export PATH="$HOME/.local/bin:$PATH"
+
 # Configuration étendue pour outils de développement modernes (VERSION SÉCURISÉE)
 # Variables conditionnelles pour préserver les configurations existantes
 
@@ -172,6 +175,24 @@ export GOMODCACHE="$STUDENT_WORKSPACE/go/pkg/mod"
 export POETRY_HOME="$STUDENT_WORKSPACE/.poetry"
 export CONDA_PKGS_DIRS="$STUDENT_WORKSPACE/.conda/pkgs"
 export CONDA_ENVS_PATH="$STUDENT_WORKSPACE/.conda/envs"
+
+# Claude Code (binaires et cache redirigés via symlinks vers /tmp)
+[[ "$STUDENT_USE_PORTABLE_CLAUDE" == "1" ]] && {
+    local _claude_data="$STUDENT_WORKSPACE/.local/share/claude"
+    local _claude_cache="$STUDENT_WORKSPACE/.cache/claude"
+    mkdir -p "$_claude_data" "$_claude_cache" 2>/dev/null
+    # Créer les symlinks si nécessaire (redirection transparente)
+    [[ ! -L "$HOME/.local/share/claude" ]] && {
+        rm -rf "$HOME/.local/share/claude" 2>/dev/null
+        mkdir -p "$HOME/.local/share" 2>/dev/null
+        ln -sf "$_claude_data" "$HOME/.local/share/claude"
+    }
+    [[ ! -L "$HOME/.cache/claude" ]] && {
+        rm -rf "$HOME/.cache/claude" 2>/dev/null
+        mkdir -p "$HOME/.cache" 2>/dev/null
+        ln -sf "$_claude_cache" "$HOME/.cache/claude"
+    }
+}
 
 # Configuration des caches génériques XDG (CRITIQUE - PROTECTION MAXIMALE)
 # Ces variables ne sont définies que si explicitement demandées car elles affectent TOUTES les applications
@@ -248,6 +269,11 @@ alias docker_status='echo "🐳 Docker portable : ${STUDENT_USE_PORTABLE_DOCKER:
 alias vagrant_on='export STUDENT_USE_PORTABLE_VAGRANT=1 && export VAGRANT_HOME="$STUDENT_WORKSPACE/.vagrant.d" && mkdir -p "$VAGRANT_HOME" && echo "📦 Vagrant portable activé (VAGRANT_HOME=$VAGRANT_HOME)"'
 alias vagrant_off='export STUDENT_USE_PORTABLE_VAGRANT=0 && unset VAGRANT_HOME && echo "📦 Vagrant portable désactivé (VAGRANT_HOME par défaut)"'
 alias vagrant_status='echo "📦 Vagrant portable : ${STUDENT_USE_PORTABLE_VAGRANT:-0} $([ "${STUDENT_USE_PORTABLE_VAGRANT:-0}" = "1" ] && echo "✅ VAGRANT_HOME=$VAGRANT_HOME" || echo "❌ (défaut: ~/.vagrant.d)")"'
+
+# Contrôle Claude Code portable
+alias claude_on='export STUDENT_USE_PORTABLE_CLAUDE=1 && mkdir -p "$STUDENT_WORKSPACE/.local/share/claude" "$STUDENT_WORKSPACE/.cache/claude" && [[ ! -L "$HOME/.local/share/claude" ]] && { rm -rf "$HOME/.local/share/claude" 2>/dev/null; ln -sf "$STUDENT_WORKSPACE/.local/share/claude" "$HOME/.local/share/claude"; }; [[ ! -L "$HOME/.cache/claude" ]] && { rm -rf "$HOME/.cache/claude" 2>/dev/null; ln -sf "$STUDENT_WORKSPACE/.cache/claude" "$HOME/.cache/claude"; }; export PATH="$HOME/.local/bin:$PATH"; echo "🤖 Claude Code portable activé (données dans $STUDENT_WORKSPACE)"'
+alias claude_off='export STUDENT_USE_PORTABLE_CLAUDE=0 && echo "🤖 Claude Code portable désactivé (redémarrez le terminal pour annuler les symlinks)"'
+alias claude_status='echo "🤖 Claude portable  : ${STUDENT_USE_PORTABLE_CLAUDE:-0} $([ "${STUDENT_USE_PORTABLE_CLAUDE:-0}" = "1" ] && echo "✅ données=$STUDENT_WORKSPACE" || echo "❌ (défaut: ~/.local/share/claude)")"'
 
 if [[ -f "$HOME/42/42_ZSH_Scripts/BrewInstaller.sh" ]]; then
     alias IBrew="$HOME/42/42_ZSH_Scripts/BrewInstaller.sh"
@@ -1320,6 +1346,39 @@ EOF
     echo "   • code-portable : VS Code avec environnement temporaire"
 }
 
+ClaudeInstall() {
+    echo "🤖 Installation de Claude Code..."
+
+    # Activer le mode portable si pas déjà fait
+    if [[ "${STUDENT_USE_PORTABLE_CLAUDE:-0}" != "1" ]]; then
+        echo "📂 Activation du mode portable Claude (données dans $STUDENT_WORKSPACE)..."
+        export STUDENT_USE_PORTABLE_CLAUDE=1
+        mkdir -p "$STUDENT_WORKSPACE/.local/share/claude" "$STUDENT_WORKSPACE/.cache/claude" 2>/dev/null
+        [[ ! -L "$HOME/.local/share/claude" ]] && {
+            rm -rf "$HOME/.local/share/claude" 2>/dev/null
+            mkdir -p "$HOME/.local/share" 2>/dev/null
+            ln -sf "$STUDENT_WORKSPACE/.local/share/claude" "$HOME/.local/share/claude"
+        }
+        [[ ! -L "$HOME/.cache/claude" ]] && {
+            rm -rf "$HOME/.cache/claude" 2>/dev/null
+            mkdir -p "$HOME/.cache" 2>/dev/null
+            ln -sf "$STUDENT_WORKSPACE/.cache/claude" "$HOME/.cache/claude"
+        }
+    fi
+
+    # Installer via le script officiel
+    if curl -fsSL https://claude.ai/install.sh | bash; then
+        logs_success "Claude Code installé avec succès"
+        echo ""
+        echo "✅ Claude Code disponible : $(claude --version 2>/dev/null || echo 'redémarrez le terminal')"
+        echo "💡 Lancez 'claude' pour commencer"
+    else
+        logs_error "Échec de l'installation de Claude Code"
+        echo "💡 Vérifiez l'espace disque : df -h $STUDENT_WORKSPACE"
+        return 1
+    fi
+}
+
 # Fonction étendue DevInstall avec support IDE
 DevInstall() {
     local tool="$1"
@@ -1346,24 +1405,29 @@ DevInstall() {
         "ide")
             SetupIDEEnvironment
             ;;
+        "claude")
+            ClaudeInstall
+            ;;
         "all")
             echo "🚀 Installation complète des outils de développement..."
             JavaInstall
             AndroidSDKInstall
-            RustInstall  
+            RustInstall
             GoInstall
             PoetryInstall
             SetupIDEEnvironment
+            ClaudeInstall
             echo "✅ Installation terminée. Redémarrez votre terminal."
             ;;
         *)
-            echo "Usage: DevInstall {java|android|rust|go|poetry|vscode-ext|ide|all} [version]"
+            echo "Usage: DevInstall {java|android|rust|go|poetry|vscode-ext|ide|claude|all} [version]"
             echo "Exemples:"
             echo "  DevInstall java 11"
             echo "  DevInstall android"
             echo "  DevInstall poetry"
             echo "  DevInstall vscode-ext"
             echo "  DevInstall ide"
+            echo "  DevInstall claude"
             echo "  DevInstall all"
             ;;
     esac
@@ -1373,6 +1437,7 @@ DevInstall() {
 alias install_poetry='DevInstall poetry'
 alias install_vscode_ext='DevInstall vscode-ext'
 alias setup_ide='DevInstall ide'
+alias install_claude='DevInstall claude'
 
 # Fonction de diagnostic de l'environnement VS Code
 VSCodeEnvironmentCheck() {
@@ -1446,6 +1511,7 @@ export STUDENT_USE_PORTABLE_DOCKER=${STUDENT_USE_PORTABLE_DOCKER:-0}
 export STUDENT_USE_PORTABLE_VAGRANT=${STUDENT_USE_PORTABLE_VAGRANT:-0}
 export STUDENT_USE_PORTABLE_VSCODE=${STUDENT_USE_PORTABLE_VSCODE:-0}
 export STUDENT_USE_PORTABLE_IDEA=${STUDENT_USE_PORTABLE_IDEA:-0}
+export STUDENT_USE_PORTABLE_CLAUDE=${STUDENT_USE_PORTABLE_CLAUDE:-0}
 export STUDENT_USE_PORTABLE_XDG=${STUDENT_USE_PORTABLE_XDG:-0}
 
 # Fonction de diagnostic rapide
@@ -1493,6 +1559,7 @@ SafeMode() {
     export STUDENT_USE_PORTABLE_VAGRANT=0
     export STUDENT_USE_PORTABLE_VSCODE=0
     export STUDENT_USE_PORTABLE_IDEA=0
+    export STUDENT_USE_PORTABLE_CLAUDE=0
     export STUDENT_USE_PORTABLE_XDG=0
 
     echo "🛡️  Mode sécurisé activé - aucun impact sur vos configurations existantes"
@@ -1552,12 +1619,17 @@ ConfigurePortableEnvironment() {
     read -r idea_choice
     [[ "$idea_choice" =~ ^[Yy]$ ]] && export STUDENT_USE_PORTABLE_IDEA=1 || export STUDENT_USE_PORTABLE_IDEA=0
 
+    # Claude Code
+    echo -n "7. Claude Code portable (binaires et cache dans /tmp) [y/N]: "
+    read -r claude_choice
+    [[ "$claude_choice" =~ ^[Yy]$ ]] && export STUDENT_USE_PORTABLE_CLAUDE=1 || export STUDENT_USE_PORTABLE_CLAUDE=0
+
     # XDG (CRITIQUE)
     echo ""
     echo "⚠️  ATTENTION: Variables XDG (IMPACT CRITIQUE)"
     echo "   Ceci affectera TOUTES les applications Linux qui utilisent les standards XDG"
     echo "   Applications concernées: Firefox, Chrome, LibreOffice, GNOME, KDE, etc."
-    echo -n "7. Variables XDG portables (XDG_CONFIG_HOME, XDG_DATA_HOME) [y/N]: "
+    echo -n "8. Variables XDG portables (XDG_CONFIG_HOME, XDG_DATA_HOME) [y/N]: "
     read -r xdg_choice
     [[ "$xdg_choice" =~ ^[Yy]$ ]] && export STUDENT_USE_PORTABLE_XDG=1 || export STUDENT_USE_PORTABLE_XDG=0
     
@@ -1569,6 +1641,7 @@ ConfigurePortableEnvironment() {
     echo "   Vagrant portable : ${STUDENT_USE_PORTABLE_VAGRANT}"
     echo "   VS Code portable : ${STUDENT_USE_PORTABLE_VSCODE}"
     echo "   IDEA portable    : ${STUDENT_USE_PORTABLE_IDEA}"
+    echo "   Claude portable  : ${STUDENT_USE_PORTABLE_CLAUDE}"
     echo "   XDG portable     : ${STUDENT_USE_PORTABLE_XDG}"
     
     echo ""
@@ -1592,6 +1665,7 @@ export STUDENT_USE_PORTABLE_DOCKER=${STUDENT_USE_PORTABLE_DOCKER}
 export STUDENT_USE_PORTABLE_VAGRANT=${STUDENT_USE_PORTABLE_VAGRANT}
 export STUDENT_USE_PORTABLE_VSCODE=${STUDENT_USE_PORTABLE_VSCODE}
 export STUDENT_USE_PORTABLE_IDEA=${STUDENT_USE_PORTABLE_IDEA}
+export STUDENT_USE_PORTABLE_CLAUDE=${STUDENT_USE_PORTABLE_CLAUDE}
 export STUDENT_USE_PORTABLE_XDG=${STUDENT_USE_PORTABLE_XDG}
 # Fin Configuration Portable
 EOF
@@ -1642,8 +1716,9 @@ DisableAllPortable() {
     export STUDENT_USE_PORTABLE_DOCKER=0
     export STUDENT_USE_PORTABLE_VSCODE=0
     export STUDENT_USE_PORTABLE_IDEA=0
+    export STUDENT_USE_PORTABLE_CLAUDE=0
     export STUDENT_USE_PORTABLE_XDG=0
-    
+
     echo "🛡️  Toutes les variables portables désactivées"
     echo "🔄 Redémarrez votre terminal pour appliquer : exec zsh"
 }
@@ -1659,6 +1734,7 @@ ShowPortableStatus() {
     echo "Vagrant portable : ${STUDENT_USE_PORTABLE_VAGRANT:-0} $([ "${STUDENT_USE_PORTABLE_VAGRANT:-0}" = "1" ] && echo "✅" || echo "❌")"
     echo "VS Code portable : ${STUDENT_USE_PORTABLE_VSCODE:-0} $([ "${STUDENT_USE_PORTABLE_VSCODE:-0}" = "1" ] && echo "✅" || echo "❌")"
     echo "IDEA portable    : ${STUDENT_USE_PORTABLE_IDEA:-0} $([ "${STUDENT_USE_PORTABLE_IDEA:-0}" = "1" ] && echo "✅" || echo "❌")"
+    echo "Claude portable  : ${STUDENT_USE_PORTABLE_CLAUDE:-0} $([ "${STUDENT_USE_PORTABLE_CLAUDE:-0}" = "1" ] && echo "✅" || echo "❌")"
     echo "XDG portable     : ${STUDENT_USE_PORTABLE_XDG:-0} $([ "${STUDENT_USE_PORTABLE_XDG:-0}" = "1" ] && echo "✅ ⚠️" || echo "❌")"
     echo ""
     echo "💡 Utilisez 'configure_portable' pour modifier ces paramètres"
