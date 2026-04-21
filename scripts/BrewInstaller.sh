@@ -1,13 +1,13 @@
 #!/bin/bash
 
-# Dynamic workspace detection with user-specific fallback
-WORKSPACE_DIR="${STUDENT_WORKSPACE:-/tmp/tmp/${USER:-$(whoami)}}"
+# Workspace utilisateur isolé (aligné avec data/.zshrc : /tmp/$USER, sticky bit 1777)
+WORKSPACE_DIR="${STUDENT_WORKSPACE:-/tmp/$(id -un)}"
 
-# Ensure the workspace directory exists and is writable
+# Echec explicite si le workspace n'est pas accessible (plus de fallback multi-user-unsafe)
 if ! mkdir -p "$WORKSPACE_DIR" 2>/dev/null || [[ ! -w "$WORKSPACE_DIR" ]]; then
-    echo "Warning: Ecriture impossible dans $WORKSPACE_DIR. Utilisation de /tmp/tmp à la place."
-    WORKSPACE_DIR="/tmp/tmp"
-    mkdir -p "$WORKSPACE_DIR" 2>/dev/null
+    echo "Erreur: Ecriture impossible dans $WORKSPACE_DIR." >&2
+    echo "Vérifiez les permissions de /tmp (doit être sticky 1777) et que \$USER est défini." >&2
+    exit 1
 fi
 
 echo "Installation de Homebrew dans: $WORKSPACE_DIR"

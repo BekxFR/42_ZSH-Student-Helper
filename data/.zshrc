@@ -163,7 +163,12 @@ export GOMODCACHE="$STUDENT_WORKSPACE/go/pkg/mod"
 [[ "$STUDENT_USE_PORTABLE_VAGRANT" == "1" ]] && export VAGRANT_HOME="$STUDENT_WORKSPACE/.vagrant.d"
 
 # Configuration IDE et éditeurs - PRÉSERVATION DE L'ENVIRONNEMENT EXISTANT (VERSION SÉCURISÉE)
-# Ces variables sont optionnelles et conditionnelles
+# Ces variables sont optionnelles et conditionnelles.
+# IMPORTANT : VSCODE_PORTABLE_EXTENSIONS définit UNIQUEMENT le chemin candidat
+# pour l'alias opt-in `code-portable` et la fonction `VSCodeExtensionsInstall`.
+# Le wrapper `code()` qui injectait --extensions-dir/--user-data-dir a été retiré
+# car il forçait une réinstallation des extensions à chaque bascule de poste.
+# Pour rediriger UNIQUEMENT les caches VS Code (zéro impact), voir `cache_on`.
 [[ "$STUDENT_USE_PORTABLE_VSCODE" == "1" ]] && export VSCODE_PORTABLE_EXTENSIONS="$STUDENT_WORKSPACE/.vscode-extensions"
 [[ "$STUDENT_USE_PORTABLE_IDEA" == "1" ]] && export IDEA_PORTABLE_HOME="$STUDENT_WORKSPACE/.idea"
 
@@ -176,11 +181,12 @@ export POETRY_HOME="$STUDENT_WORKSPACE/.poetry"
 export CONDA_PKGS_DIRS="$STUDENT_WORKSPACE/.conda/pkgs"
 export CONDA_ENVS_PATH="$STUDENT_WORKSPACE/.conda/envs"
 
-# Claude Code (binaires et cache redirigés via symlinks vers /tmp)
+# Claude Code (binaires, cache et marketplaces de plugins redirigés via symlinks vers /tmp)
 [[ "$STUDENT_USE_PORTABLE_CLAUDE" == "1" ]] && {
     local _claude_data="$STUDENT_WORKSPACE/.local/share/claude"
     local _claude_cache="$STUDENT_WORKSPACE/.cache/claude"
-    mkdir -p "$_claude_data" "$_claude_cache" 2>/dev/null
+    local _claude_marketplaces="$STUDENT_WORKSPACE/claude-marketplaces"
+    mkdir -p "$_claude_data" "$_claude_cache" "$_claude_marketplaces" 2>/dev/null
     # Créer les symlinks si nécessaire (redirection transparente)
     [[ ! -L "$HOME/.local/share/claude" ]] && {
         rm -rf "$HOME/.local/share/claude" 2>/dev/null
@@ -192,6 +198,33 @@ export CONDA_ENVS_PATH="$STUDENT_WORKSPACE/.conda/envs"
         mkdir -p "$HOME/.cache" 2>/dev/null
         ln -sf "$_claude_cache" "$HOME/.cache/claude"
     }
+    # Marketplaces de plugins : évite l'échec "could not create leading directories"
+    # quand /tmp est vidé entre les sessions (nécessaire pour /plugin install)
+    [[ ! -L "$HOME/.claude/plugins/marketplaces" ]] && {
+        rm -rf "$HOME/.claude/plugins/marketplaces" 2>/dev/null
+        mkdir -p "$HOME/.claude/plugins" 2>/dev/null
+        ln -sf "$_claude_marketplaces" "$HOME/.claude/plugins/marketplaces"
+    }
+}
+
+# Redirection des caches régénérables VS Code vers /tmp (ZÉRO IMPACT UTILISATEUR)
+# Seuls les dossiers 100% régénérables sont ciblés :
+#   - Crashpad, GPUCache, logs, CachedProfilesData, DawnWebGPUCache, DawnGraphiteCache
+# Exclus volontairement : User/ (settings, snippets, History, workspaceStorage),
+# WebStorage (risque d'authentification d'extensions), globalStorage (tokens).
+[[ "$STUDENT_USE_PORTABLE_CACHE" == "1" ]] && {
+    local _vscode_cache_root="$STUDENT_WORKSPACE/vscode-cache"
+    local _vscode_config="$HOME/.config/Code"
+    if [[ -d "$_vscode_config" ]]; then
+        local _cache_dir
+        for _cache_dir in Crashpad GPUCache logs CachedProfilesData DawnWebGPUCache DawnGraphiteCache; do
+            mkdir -p "$_vscode_cache_root/$_cache_dir" 2>/dev/null
+            if [[ ! -L "$_vscode_config/$_cache_dir" ]]; then
+                rm -rf "$_vscode_config/$_cache_dir" 2>/dev/null
+                ln -sf "$_vscode_cache_root/$_cache_dir" "$_vscode_config/$_cache_dir"
+            fi
+        done
+    fi
 }
 
 # Configuration des caches génériques XDG (CRITIQUE - PROTECTION MAXIMALE)
@@ -271,9 +304,39 @@ alias vagrant_off='export STUDENT_USE_PORTABLE_VAGRANT=0 && unset VAGRANT_HOME &
 alias vagrant_status='echo "📦 Vagrant portable : ${STUDENT_USE_PORTABLE_VAGRANT:-0} $([ "${STUDENT_USE_PORTABLE_VAGRANT:-0}" = "1" ] && echo "✅ VAGRANT_HOME=$VAGRANT_HOME" || echo "❌ (défaut: ~/.vagrant.d)")"'
 
 # Contrôle Claude Code portable
-alias claude_on='export STUDENT_USE_PORTABLE_CLAUDE=1 && mkdir -p "$STUDENT_WORKSPACE/.local/share/claude" "$STUDENT_WORKSPACE/.cache/claude" && [[ ! -L "$HOME/.local/share/claude" ]] && { rm -rf "$HOME/.local/share/claude" 2>/dev/null; ln -sf "$STUDENT_WORKSPACE/.local/share/claude" "$HOME/.local/share/claude"; }; [[ ! -L "$HOME/.cache/claude" ]] && { rm -rf "$HOME/.cache/claude" 2>/dev/null; ln -sf "$STUDENT_WORKSPACE/.cache/claude" "$HOME/.cache/claude"; }; export PATH="$HOME/.local/bin:$PATH"; echo "🤖 Claude Code portable activé (données dans $STUDENT_WORKSPACE)"'
+alias claude_on='export STUDENT_USE_PORTABLE_CLAUDE=1 && mkdir -p "$STUDENT_WORKSPACE/.local/share/claude" "$STUDENT_WORKSPACE/.cache/claude" "$STUDENT_WORKSPACE/claude-marketplaces" && [[ ! -L "$HOME/.local/share/claude" ]] && { rm -rf "$HOME/.local/share/claude" 2>/dev/null; ln -sf "$STUDENT_WORKSPACE/.local/share/claude" "$HOME/.local/share/claude"; }; [[ ! -L "$HOME/.cache/claude" ]] && { rm -rf "$HOME/.cache/claude" 2>/dev/null; ln -sf "$STUDENT_WORKSPACE/.cache/claude" "$HOME/.cache/claude"; }; [[ ! -L "$HOME/.claude/plugins/marketplaces" ]] && { rm -rf "$HOME/.claude/plugins/marketplaces" 2>/dev/null; mkdir -p "$HOME/.claude/plugins" 2>/dev/null; ln -sf "$STUDENT_WORKSPACE/claude-marketplaces" "$HOME/.claude/plugins/marketplaces"; }; export PATH="$HOME/.local/bin:$PATH"; echo "🤖 Claude Code portable activé (données dans $STUDENT_WORKSPACE)"'
 alias claude_off='export STUDENT_USE_PORTABLE_CLAUDE=0 && echo "🤖 Claude Code portable désactivé (redémarrez le terminal pour annuler les symlinks)"'
 alias claude_status='echo "🤖 Claude portable  : ${STUDENT_USE_PORTABLE_CLAUDE:-0} $([ "${STUDENT_USE_PORTABLE_CLAUDE:-0}" = "1" ] && echo "✅ données=$STUDENT_WORKSPACE" || echo "❌ (défaut: ~/.local/share/claude)")"'
+
+# Contrôle des caches régénérables (VS Code) - zéro impact utilisateur
+# Symlinks vers /tmp pour Crashpad, GPUCache, logs, CachedProfilesData, Dawn*Cache
+alias cache_on='export STUDENT_USE_PORTABLE_CACHE=1 && { _vcr="$STUDENT_WORKSPACE/vscode-cache"; _vcc="$HOME/.config/Code"; if [[ -d "$_vcc" ]]; then for _d in Crashpad GPUCache logs CachedProfilesData DawnWebGPUCache DawnGraphiteCache; do mkdir -p "$_vcr/$_d" 2>/dev/null; [[ ! -L "$_vcc/$_d" ]] && { rm -rf "$_vcc/$_d" 2>/dev/null; ln -sf "$_vcr/$_d" "$_vcc/$_d"; }; done; fi; unset _vcr _vcc _d; }; echo "🧹 Caches régénérables VS Code redirigés vers /tmp (aucun impact utilisateur)"'
+alias cache_off='export STUDENT_USE_PORTABLE_CACHE=0 && { _vcc="$HOME/.config/Code"; for _d in Crashpad GPUCache logs CachedProfilesData DawnWebGPUCache DawnGraphiteCache; do [[ -L "$_vcc/$_d" ]] && { rm -f "$_vcc/$_d"; mkdir -p "$_vcc/$_d"; }; done; unset _vcc _d; }; echo "🧹 Caches VS Code restaurés dans ~/.config/Code (redémarrez VS Code)"'
+alias cache_status='echo "🧹 Cache portable   : ${STUDENT_USE_PORTABLE_CACHE:-0} $([ "${STUDENT_USE_PORTABLE_CACHE:-0}" = "1" ] && echo "✅ VS Code caches → $STUDENT_WORKSPACE/vscode-cache" || echo "❌ (défaut: ~/.config/Code)")"'
+
+# Nettoyage manuel des caches navigateurs (chemins variables selon profils → pas de symlink automatique)
+# Supprime uniquement : Cache/, Code Cache/, GPUCache/ à l'intérieur des profils existants
+CleanBrowserCache() {
+    local total_freed=0
+    local browser_root profile cache_sub
+    for browser_root in "$HOME/.config/google-chrome" "$HOME/.config/chromium" "$HOME/.config/BraveSoftware/Brave-Browser"; do
+        [[ -d "$browser_root" ]] || continue
+        for profile in "$browser_root"/*/; do
+            [[ -d "$profile" ]] || continue
+            for cache_sub in "Cache" "Code Cache" "GPUCache"; do
+                if [[ -d "$profile$cache_sub" ]]; then
+                    local size_kb
+                    size_kb=$(du -sk "$profile$cache_sub" 2>/dev/null | awk '{print $1}')
+                    rm -rf "$profile$cache_sub"/* 2>/dev/null
+                    total_freed=$((total_freed + size_kb))
+                fi
+            done
+        done
+    done
+    echo "🧹 Caches navigateurs purgés : $((total_freed / 1024)) MB libérés"
+    echo "   (cookies, favoris, sessions, extensions préservés)"
+}
+alias clean_browser_cache='CleanBrowserCache'
 
 if [[ -f "$HOME/42/42_ZSH_Scripts/BrewInstaller.sh" ]]; then
     alias IBrew="$HOME/42/42_ZSH_Scripts/BrewInstaller.sh"
@@ -466,8 +529,7 @@ install_homebrew_if_needed() {
 setup_norminette_alias() {
     local flake8_locations=(
         "${STUDENT_WORKSPACE}/bin/flake8"                  # Installation temporaire utilisateur
-        "/tmp/tmp/bin/flake8"                              # Installation temporaire legacy
-        "/mnt/nfs/homes/chillion/.local/bin/flake8"        # Installation user classique
+        "$HOME/.local/bin/flake8"                          # Installation user classique (pip --user)
         "$(command -v flake8 2>/dev/null)"                 # PATH système
     )
     
@@ -512,7 +574,7 @@ setup_42zsh_environment() {
 
     local force_sync=0
     
-    if [[ ! -d "/tmp/tmp" ]] || \
+    if [[ ! -d "$STUDENT_WORKSPACE" ]] || \
        [[ "${AUTO_INSTALL_BREW:-1}" == "1" && ! -x "${STUDENT_WORKSPACE}/homebrew/bin/brew" ]] || \
        [[ "$PATH" != *"${STUDENT_WORKSPACE}/homebrew/bin"* ]]; then
         force_sync=1
@@ -590,7 +652,7 @@ rlwrap() {
     
     # Vérifier spécifiquement l'exécutable rlwrap dans les emplacements Homebrew
     local rlwrap_locations=(
-        "/tmp/tmp/homebrew/bin/rlwrap"     # Homebrew temporaire
+        "$STUDENT_WORKSPACE/homebrew/bin/rlwrap"   # Homebrew portable utilisateur
         "$(brew --prefix 2>/dev/null)/bin/rlwrap"  # Homebrew système
     )
     
@@ -640,7 +702,7 @@ STmp() {
     
     # Définir le répertoire cible
     if [ $# -eq 0 ]; then
-        target_dir="${STUDENT_WORKSPACE:-/tmp/tmp}"
+        target_dir="${STUDENT_WORKSPACE:-/tmp/$(id -un)}"
     else
         target_dir="$1"
     fi
@@ -706,7 +768,8 @@ STmp() {
     # Afficher le répertoire de travail actuel
     echo "📁 Répertoire de travail: $(pwd)"
     
-    # Lancer VS Code
+    # Lancer VS Code (sans surcharge --extensions-dir/--user-data-dir
+    # — les extensions/settings système sont préservés par défaut)
     if command -v code >/dev/null 2>&1; then
         echo "🚀 Lancement de VS Code..."
         code . &>/dev/null &
@@ -824,7 +887,7 @@ discord() {
 
 # Version avec eval pour Discord
 discord_eval() {
-    local DISCORD_DIR="/tmp/tmp/discord"
+    local DISCORD_DIR="$STUDENT_WORKSPACE/discord"
     local DOWNLOAD_URL="https://discord.com/api/download?platform=linux&format=tar.gz"
     local VS_CODE_DETECTED=false
     local BASE_FLAGS=("--no-sandbox" "--disable-dev-shm-usage")
@@ -900,7 +963,7 @@ discord_eval() {
 
 # Version avec pushd/popd pour une gestion plus robuste des répertoires
 discord_pushd() {
-    local DISCORD_DIR="/tmp/tmp/discord"
+    local DISCORD_DIR="$STUDENT_WORKSPACE/discord"
     local DOWNLOAD_URL="https://discord.com/api/download?platform=linux&format=tar.gz"
     local VS_CODE_DETECTED=false
     local BASE_FLAGS=("--no-sandbox" "--disable-dev-shm-usage")
@@ -977,13 +1040,13 @@ discord_pushd() {
 
 # Alias de debug pour Discord avec retour au répertoire d'origine
 alias discord_debug='VSCODE_PID="" discord'
-alias discord_force='ORIGINAL_PWD="$(pwd)" && cd /tmp/tmp/discord && ./Discord/Discord --no-sandbox --disable-dev-shm-usage 2>&1; cd "$ORIGINAL_PWD"'
-alias discord_minimal='ORIGINAL_PWD="$(pwd)" && cd /tmp/tmp/discord && ./Discord/Discord 2>&1; cd "$ORIGINAL_PWD"'
+alias discord_force='ORIGINAL_PWD="$(pwd)" && cd "$STUDENT_WORKSPACE/discord" && ./Discord/Discord --no-sandbox --disable-dev-shm-usage 2>&1; cd "$ORIGINAL_PWD"'
+alias discord_minimal='ORIGINAL_PWD="$(pwd)" && cd "$STUDENT_WORKSPACE/discord" && ./Discord/Discord 2>&1; cd "$ORIGINAL_PWD"'
 
 # Fonction utilitaire pour tester Discord depuis n'importe quel répertoire
 discord_test() {
     echo "🧪 Test de lancement Discord depuis: $(pwd)"
-    echo "📂 Installation/lancement dans: /tmp/tmp/discord"
+    echo "📂 Installation/lancement dans: $STUDENT_WORKSPACE/discord"
     discord
     echo "📁 Vous êtes maintenant dans: $(pwd)"
 }
@@ -1353,7 +1416,7 @@ ClaudeInstall() {
     if [[ "${STUDENT_USE_PORTABLE_CLAUDE:-0}" != "1" ]]; then
         echo "📂 Activation du mode portable Claude (données dans $STUDENT_WORKSPACE)..."
         export STUDENT_USE_PORTABLE_CLAUDE=1
-        mkdir -p "$STUDENT_WORKSPACE/.local/share/claude" "$STUDENT_WORKSPACE/.cache/claude" 2>/dev/null
+        mkdir -p "$STUDENT_WORKSPACE/.local/share/claude" "$STUDENT_WORKSPACE/.cache/claude" "$STUDENT_WORKSPACE/claude-marketplaces" 2>/dev/null
         [[ ! -L "$HOME/.local/share/claude" ]] && {
             rm -rf "$HOME/.local/share/claude" 2>/dev/null
             mkdir -p "$HOME/.local/share" 2>/dev/null
@@ -1363,6 +1426,12 @@ ClaudeInstall() {
             rm -rf "$HOME/.cache/claude" 2>/dev/null
             mkdir -p "$HOME/.cache" 2>/dev/null
             ln -sf "$STUDENT_WORKSPACE/.cache/claude" "$HOME/.cache/claude"
+        }
+        # Prérequis pour /plugin install : dossier marketplaces redirigé vers /tmp
+        [[ ! -L "$HOME/.claude/plugins/marketplaces" ]] && {
+            rm -rf "$HOME/.claude/plugins/marketplaces" 2>/dev/null
+            mkdir -p "$HOME/.claude/plugins" 2>/dev/null
+            ln -sf "$STUDENT_WORKSPACE/claude-marketplaces" "$HOME/.claude/plugins/marketplaces"
         }
     fi
 
@@ -1512,6 +1581,7 @@ export STUDENT_USE_PORTABLE_VAGRANT=${STUDENT_USE_PORTABLE_VAGRANT:-0}
 export STUDENT_USE_PORTABLE_VSCODE=${STUDENT_USE_PORTABLE_VSCODE:-0}
 export STUDENT_USE_PORTABLE_IDEA=${STUDENT_USE_PORTABLE_IDEA:-0}
 export STUDENT_USE_PORTABLE_CLAUDE=${STUDENT_USE_PORTABLE_CLAUDE:-0}
+export STUDENT_USE_PORTABLE_CACHE=${STUDENT_USE_PORTABLE_CACHE:-0}
 export STUDENT_USE_PORTABLE_XDG=${STUDENT_USE_PORTABLE_XDG:-0}
 
 # Fonction de diagnostic rapide
@@ -1521,22 +1591,10 @@ EnvironmentSafetyCheck() {
     
     local warnings=0
     
-    # Vérifier Java
-    if [[ -n "$JAVA_HOME" && "$JAVA_HOME" == *"/tmp/tmp"* && "${STUDENT_USE_PORTABLE_JAVA}" != "1" ]]; then
-        echo "⚠️  JAVA_HOME redéfini sans activation explicite"
-        ((warnings++))
-    fi
-    
     # Vérifier Python
     if [[ -n "$PYTHONUSERBASE" && "${STUDENT_USE_PORTABLE_PYTHON}" != "1" ]]; then
         echo "⚠️  Python utilisateur redéfini sans activation explicite"
         ((warnings++))
-    fi
-    
-    # Vérifier XDG (critique)
-    if [[ -n "$XDG_CONFIG_HOME" && "$XDG_CONFIG_HOME" == *"/tmp/tmp"* && "${STUDENT_USE_PORTABLE_XDG}" != "1" ]]; then
-        echo "🚨 XDG_CONFIG_HOME redéfini - IMPACT CRITIQUE sur toutes les applications!"
-        ((warnings+=3))
     fi
     
     # Résumé
@@ -1560,6 +1618,7 @@ SafeMode() {
     export STUDENT_USE_PORTABLE_VSCODE=0
     export STUDENT_USE_PORTABLE_IDEA=0
     export STUDENT_USE_PORTABLE_CLAUDE=0
+    export STUDENT_USE_PORTABLE_CACHE=0
     export STUDENT_USE_PORTABLE_XDG=0
 
     echo "🛡️  Mode sécurisé activé - aucun impact sur vos configurations existantes"
@@ -1609,8 +1668,10 @@ ConfigurePortableEnvironment() {
     read -r vagrant_choice
     [[ "$vagrant_choice" =~ ^[Yy]$ ]] && export STUDENT_USE_PORTABLE_VAGRANT=1 || export STUDENT_USE_PORTABLE_VAGRANT=0
 
-    # VS Code
-    echo -n "5. VS Code portable (extensions) [y/N]: "
+    # VS Code : définit UNIQUEMENT le chemin VSCODE_PORTABLE_EXTENSIONS pour
+    # l'alias opt-in `code-portable`. Ne modifie pas le comportement de `code`
+    # par défaut. Pour rediriger les caches VS Code, voir l'option 7 (cache).
+    echo -n "5. VS Code : chemin d'extensions portable opt-in (alias code-portable) [y/N]: "
     read -r vscode_choice
     [[ "$vscode_choice" =~ ^[Yy]$ ]] && export STUDENT_USE_PORTABLE_VSCODE=1 || export STUDENT_USE_PORTABLE_VSCODE=0
 
@@ -1624,12 +1685,17 @@ ConfigurePortableEnvironment() {
     read -r claude_choice
     [[ "$claude_choice" =~ ^[Yy]$ ]] && export STUDENT_USE_PORTABLE_CLAUDE=1 || export STUDENT_USE_PORTABLE_CLAUDE=0
 
+    # Caches VS Code régénérables
+    echo -n "8. Caches VS Code régénérables portables (Crashpad/GPUCache/logs, zéro perte) [y/N]: "
+    read -r cache_choice
+    [[ "$cache_choice" =~ ^[Yy]$ ]] && export STUDENT_USE_PORTABLE_CACHE=1 || export STUDENT_USE_PORTABLE_CACHE=0
+
     # XDG (CRITIQUE)
     echo ""
     echo "⚠️  ATTENTION: Variables XDG (IMPACT CRITIQUE)"
     echo "   Ceci affectera TOUTES les applications Linux qui utilisent les standards XDG"
     echo "   Applications concernées: Firefox, Chrome, LibreOffice, GNOME, KDE, etc."
-    echo -n "8. Variables XDG portables (XDG_CONFIG_HOME, XDG_DATA_HOME) [y/N]: "
+    echo -n "9. Variables XDG portables (XDG_CONFIG_HOME, XDG_DATA_HOME) [y/N]: "
     read -r xdg_choice
     [[ "$xdg_choice" =~ ^[Yy]$ ]] && export STUDENT_USE_PORTABLE_XDG=1 || export STUDENT_USE_PORTABLE_XDG=0
     
@@ -1639,9 +1705,10 @@ ConfigurePortableEnvironment() {
     echo "   Python portable  : ${STUDENT_USE_PORTABLE_PYTHON}"
     echo "   Docker portable  : ${STUDENT_USE_PORTABLE_DOCKER}"
     echo "   Vagrant portable : ${STUDENT_USE_PORTABLE_VAGRANT}"
-    echo "   VS Code portable : ${STUDENT_USE_PORTABLE_VSCODE}"
+    echo "   VSCode ext. path : ${STUDENT_USE_PORTABLE_VSCODE} (opt-in via code-portable)"
     echo "   IDEA portable    : ${STUDENT_USE_PORTABLE_IDEA}"
     echo "   Claude portable  : ${STUDENT_USE_PORTABLE_CLAUDE}"
+    echo "   Cache portable   : ${STUDENT_USE_PORTABLE_CACHE}"
     echo "   XDG portable     : ${STUDENT_USE_PORTABLE_XDG}"
     
     echo ""
@@ -1666,6 +1733,7 @@ export STUDENT_USE_PORTABLE_VAGRANT=${STUDENT_USE_PORTABLE_VAGRANT}
 export STUDENT_USE_PORTABLE_VSCODE=${STUDENT_USE_PORTABLE_VSCODE}
 export STUDENT_USE_PORTABLE_IDEA=${STUDENT_USE_PORTABLE_IDEA}
 export STUDENT_USE_PORTABLE_CLAUDE=${STUDENT_USE_PORTABLE_CLAUDE}
+export STUDENT_USE_PORTABLE_CACHE=${STUDENT_USE_PORTABLE_CACHE}
 export STUDENT_USE_PORTABLE_XDG=${STUDENT_USE_PORTABLE_XDG}
 # Fin Configuration Portable
 EOF
@@ -1717,6 +1785,7 @@ DisableAllPortable() {
     export STUDENT_USE_PORTABLE_VSCODE=0
     export STUDENT_USE_PORTABLE_IDEA=0
     export STUDENT_USE_PORTABLE_CLAUDE=0
+    export STUDENT_USE_PORTABLE_CACHE=0
     export STUDENT_USE_PORTABLE_XDG=0
 
     echo "🛡️  Toutes les variables portables désactivées"

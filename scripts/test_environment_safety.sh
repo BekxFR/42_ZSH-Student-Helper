@@ -23,7 +23,7 @@ echo "TEST 1: Configuration par défaut (mode sécurisé)"
 echo "---------------------------------------------------"
 
 # Sourcer UNIQUEMENT le fichier .zshrc principal dans un environnement propre
-source /tmp/tmp/42_ZSH-Student-Helper/data/.zshrc
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/data/.zshrc"
 
 echo "Variables après sourcing (environnement propre):"
 echo "   JAVA_HOME: ${JAVA_HOME:-NON DÉFINI}"
@@ -71,7 +71,7 @@ echo "----------------------------------------"
 # Reset et test avec activation
 unset JAVA_HOME
 export STUDENT_USE_PORTABLE_JAVA=1
-source /tmp/tmp/42_ZSH-Student-Helper/data/.zshrc
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/data/.zshrc"
 
 echo "Variables après activation Java portable:"
 echo "   JAVA_HOME: ${JAVA_HOME:-NON DÉFINI}"
@@ -90,7 +90,7 @@ echo "---------------------------------------------------"
 # Reset et test avec activation XDG
 unset XDG_CONFIG_HOME XDG_DATA_HOME XDG_CACHE_HOME
 export STUDENT_USE_PORTABLE_XDG=1
-source /tmp/tmp/42_ZSH-Student-Helper/data/.zshrc
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/data/.zshrc"
 
 echo "Variables après activation XDG portable:"
 echo "   XDG_CONFIG_HOME: ${XDG_CONFIG_HOME:-NON DÉFINI}"

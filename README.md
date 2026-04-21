@@ -3,12 +3,14 @@
 ## 🎯 Qu'est-ce que c'est ?
 
 Un environnement ZSH optimisé pour les étudiants de l'école 42, conçu pour maximiser la productivité tout en respectant les contraintes de stockage strict (5GB).  
-Ce projet fournit une configuration ZSH complète avec Oh-My-Zsh, le thème Agnoster, et un système d'optimisation intelligent utilisant un espace de travail utilisateur dynamique `/tmp/tmp/USERNAME` pour économiser l'espace sur la session utilisateur tout en évitant les collisions entre utilisateurs.
+Ce projet fournit une configuration ZSH complète avec Oh-My-Zsh, le thème Agnoster, et un système d'optimisation intelligent utilisant un espace de travail utilisateur dynamique `/tmp/$USER` pour économiser l'espace sur la session utilisateur tout en évitant les collisions entre utilisateurs. **Compatible Ubuntu 20.04+ et Fedora** (migration école en cours, Fedora = cible finale).
 
 ### ✨ Caractéristiques principales
 
 - **Installation automatique** : Un seul script pour tout configurer
-- **Optimisation espace** : Utilise un espace de travail utilisateur dynamique `/tmp/tmp/USERNAME` pour économiser l'espace et éviter les collisions
+- **Optimisation espace** : Utilise un espace de travail utilisateur dynamique `/tmp/$USER` pour économiser l'espace et éviter les collisions
+- **Caches régénérables portables** : Flag `STUDENT_USE_PORTABLE_CACHE` + alias `cache_on`/`cache_off` pour rediriger les caches VS Code (`Crashpad`, `GPUCache`, `logs`, etc.) vers `/tmp/$USER/vscode-cache` 
+- **zéro impact utilisateur** (pas de reconnexion, pas de perte de config). Voir [PORTABLE_USAGE_GUIDE.md](docs/PORTABLE_USAGE_GUIDE.md).
 - **Isolation utilisateur** : Chaque utilisateur dispose de son propre environnement temporaire sécurisé
 - **Setup intelligent** : Configuration automatique de Homebrew et des outils essentiels
 - **Prêt à l'emploi** : Aliases et fonctions pratiques pour le développement

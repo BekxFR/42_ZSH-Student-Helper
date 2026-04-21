@@ -32,8 +32,8 @@ info() {
 check_prerequisites() {
     info "Vérification des prérequis système..."
 
-    if ! grep -E "ubuntu" /etc/os-release >/dev/null 2>&1; then
-        error "Système non supporté. Ubuntu 20.04+ requis."
+    if ! grep -Eq "^ID=(ubuntu|fedora)" /etc/os-release; then
+        error "Système non supporté. Ubuntu 20.04+ ou Fedora requis."
         exit 1
     fi
 

@@ -130,8 +130,8 @@ Les variables XDG (X Desktop Group) définissent où les applications stockent :
 ~/.config/git/config
 
 # APRÈS (avec XDG portable)
-/tmp/tmp/USERNAME/.config/Code/User/settings.json
-/tmp/tmp/USERNAME/.config/git/config
+/tmp/$USER/.config/Code/User/settings.json
+/tmp/$USER/.config/git/config
 ```
 
 ## 🛡️ Recommandations de Sécurité
@@ -191,6 +191,52 @@ export STUDENT_USE_PORTABLE_XDG=0
 exec zsh
 ```
 
+## 🧹 Caches régénérables VS Code (`STUDENT_USE_PORTABLE_CACHE`)
+
+Le flag `STUDENT_USE_PORTABLE_CACHE` redirige **uniquement** les caches 100 % régénérables de VS Code vers `/tmp/$USER/vscode-cache/` :
+
+- `Crashpad/` - dumps de crash
+- `GPUCache/` - cache GPU Electron
+- `logs/` - logs runtime
+- `CachedProfilesData/` - cache profils
+- `DawnWebGPUCache/` + `DawnGraphiteCache/` - caches WebGPU
+
+### Garanties « zéro impact utilisateur »
+
+- ✅ **Zéro réinstallation** d'extensions
+- ✅ **Zéro reconnexion** (Copilot, comptes Microsoft, GitHub, etc. préservés)
+- ✅ **Zéro perte de settings** (`User/settings.json`, snippets, raccourcis, profils)
+- ✅ **Zéro perte de favoris** (profils navigateurs non touchés)
+
+### Exclusions explicites
+
+Ne sont **pas** redirigés (risques utilisateur) :
+
+- `User/` (settings, snippets, sync, profiles, globalStorage)
+- `User/History/` (timeline locale, utile en cas de crash)
+- `User/workspaceStorage/` (état workspaces + tokens)
+- `WebStorage/` (IndexedDB d'extensions - Copilot Chat, etc.)
+
+### Commandes
+
+```bash
+cache_on       # Active + crée les symlinks (la session en cours applique immédiatement)
+cache_off      # Restaure les dossiers réels dans ~/.config/Code
+cache_status   # Affiche l'état du flag
+```
+
+### Nettoyage manuel navigateurs (chemins variables, pas de symlink automatique)
+
+```bash
+CleanBrowserCache   # Purge Cache/, Code Cache/, GPUCache/ dans chaque profil Chrome/Chromium/Brave
+```
+
+Cookies, favoris, sessions et extensions restent intacts.
+
+### Compatibilité NFS / bascule Ubuntu↔Fedora
+
+Sur les postes 42, `$HOME` est partagé via NFS mais `/tmp/$USER` est **local par machine**. Les symlinks (`~/.config/Code/Crashpad` → `/tmp/$USER/vscode-cache/Crashpad`) restent valides sur tous les postes car la cible est déterministe. À chaque nouveau poste, VS Code recrée les caches vides sans erreur.
+
 ## 📚 Liens Utiles
 
 - **Documentation complète** : [ENVIRONMENT_SAFETY.md](ENVIRONMENT_SAFETY.md)
@@ -199,12 +245,16 @@ exec zsh
 
 ## 🎯 Résumé des Commandes Essentielles
 
-| Commande               | Description                        |
-| ---------------------- | ---------------------------------- |
-| `enable_xdg`           | Active XDG avec avertissement      |
-| `configure_portable`   | Configuration interactive complète |
-| `portable_status`      | Affiche l'état actuel              |
-| `disable_all_portable` | Désactive tout                     |
-| `safety_check`         | Diagnostic de sécurité             |
+| Commande               | Description                                       |
+| ---------------------- | ------------------------------------------------- |
+| `enable_xdg`           | Active XDG avec avertissement                     |
+| `cache_on`             | Active les caches VS Code portables (zéro impact) |
+| `cache_off`            | Restaure les caches VS Code dans `~/.config/Code` |
+| `cache_status`         | État du flag `STUDENT_USE_PORTABLE_CACHE`         |
+| `CleanBrowserCache`    | Purge manuelle des caches Chrome/Chromium/Brave   |
+| `configure_portable`   | Configuration interactive complète                |
+| `portable_status`      | Affiche l'état actuel                             |
+| `disable_all_portable` | Désactive tout                                    |
+| `safety_check`         | Diagnostic de sécurité                            |
 
 **💡 Conseil :** Commencez toujours par `configure_portable` pour une approche guidée et sécurisée !

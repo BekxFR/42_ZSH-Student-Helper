@@ -8,9 +8,9 @@ Ce document décrit les variables d'environnement qui peuvent **affecter vos con
 
 ```bash
 # CES VARIABLES AFFECTENT TOUTES LES APPLICATIONS!
-XDG_CONFIG_HOME="/tmp/tmp/USERNAME/.config"    # Redirection de ~/.config
-XDG_DATA_HOME="/tmp/tmp/USERNAME/.local/share" # Redirection de ~/.local/share
-XDG_CACHE_HOME="/tmp/tmp/USERNAME/.cache"      # Redirection de ~/.cache
+XDG_CONFIG_HOME="/tmp/$USER/.config"    # Redirection de ~/.config
+XDG_DATA_HOME="/tmp/$USER/.local/share" # Redirection de ~/.local/share
+XDG_CACHE_HOME="/tmp/$USER/.cache"      # Redirection de ~/.cache
 ```
 
 **Impact:** Toutes les applications utilisant les standards XDG (la plupart des applications Linux modernes) vont créer leurs configurations dans votre workspace temporaire au lieu de votre dossier personnel.
@@ -21,17 +21,17 @@ XDG_CACHE_HOME="/tmp/tmp/USERNAME/.cache"      # Redirection de ~/.cache
 
 ```bash
 # Variables Java
-JAVA_HOME="/tmp/tmp/USERNAME/java"
+JAVA_HOME="/tmp/$USER/java"
 
 # Variables Python
-PYTHONUSERBASE="/tmp/tmp/USERNAME"
+PYTHONUSERBASE="/tmp/$USER"
 PIP_USER="1"
 
 # Variables Docker
-DOCKER_CONFIG="/tmp/tmp/USERNAME/.docker"
+DOCKER_CONFIG="/tmp/$USER/.docker"
 
 # Variables IDE
-IDEA_HOME="/tmp/tmp/USERNAME/.idea"
+IDEA_HOME="/tmp/$USER/.idea"
 ```
 
 **Impact:** Affecte uniquement les outils de développement spécifiques.
@@ -40,10 +40,10 @@ IDEA_HOME="/tmp/tmp/USERNAME/.idea"
 
 ```bash
 # Ces variables sont généralement sûres
-CARGO_HOME="/tmp/tmp/USERNAME/.cargo"     # Rust uniquement
-RUSTUP_HOME="/tmp/tmp/USERNAME/.rustup"   # Rust uniquement
-GOPATH="/tmp/tmp/USERNAME/go"             # Go uniquement
-ANDROID_HOME="/tmp/tmp/USERNAME/android-sdk" # Android uniquement
+CARGO_HOME="/tmp/$USER/.cargo"     # Rust uniquement
+RUSTUP_HOME="/tmp/$USER/.rustup"   # Rust uniquement
+GOPATH="/tmp/$USER/go"             # Go uniquement
+ANDROID_HOME="/tmp/$USER/android-sdk" # Android uniquement
 ```
 
 ## 🎛️ Système de Contrôle
@@ -57,10 +57,19 @@ Utilisez ces variables pour activer/désactiver les fonctionnalités :
 export STUDENT_USE_PORTABLE_JAVA=0      # Java portable
 export STUDENT_USE_PORTABLE_PYTHON=0    # Python portable
 export STUDENT_USE_PORTABLE_DOCKER=0    # Docker portable
-export STUDENT_USE_PORTABLE_VSCODE=0    # VS Code portable
+export STUDENT_USE_PORTABLE_VAGRANT=0   # Vagrant portable
+export STUDENT_USE_PORTABLE_VSCODE=0    # VS Code : définit uniquement VSCODE_PORTABLE_EXTENSIONS
+                                         # pour l'alias opt-in `code-portable`. Le wrapper `code()`
+                                         # injectant --extensions-dir/--user-data-dir a été retiré
+                                         # (forçait la réinstallation d'extensions à chaque poste).
+                                         # Pour les caches seulement, voir STUDENT_USE_PORTABLE_CACHE.
 export STUDENT_USE_PORTABLE_IDEA=0      # IntelliJ portable
+export STUDENT_USE_PORTABLE_CLAUDE=0    # Claude Code portable (symlinks ~/.local/share/claude)
+export STUDENT_USE_PORTABLE_CACHE=0     # Caches VS Code régénérables (Crashpad, GPUCache, logs) - zéro impact
 export STUDENT_USE_PORTABLE_XDG=0       # Variables XDG (DANGEREUX!)
 ```
+
+> **Compatibilité OS** : l'ensemble du projet supporte Ubuntu 20.04+ **et Fedora**. Le `$HOME` étant partagé NFS entre postes, tous les symlinks portables ciblent `/tmp/$USER` (path déterministe) pour rester valides lors d'une bascule Ubuntu↔Fedora.
 
 ### Modes de Configuration
 

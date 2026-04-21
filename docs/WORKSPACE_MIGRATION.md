@@ -30,17 +30,14 @@ export STUDENT_WORKSPACE="/tmp/${USER:-$(whoami)}"
 ### Avantages de la Migration
 
 1. **Accessibilité Universelle**
-
    - Chaque utilisateur peut créer son propre workspace
    - Pas de dépendance aux permissions d'un autre utilisateur
 
 2. **Isolation Naturelle**
-
    - `/tmp/alice`, `/tmp/bob`, `/tmp/charlie`
    - Séparation automatique par utilisateur
 
 3. **Conformité Standards Unix**
-
    - Utilisation directe de `/tmp` (permissions 1777)
    - Respect des conventions système
 
@@ -95,7 +92,6 @@ cleanup_stale_processes() {
 ### Pour les Utilisateurs Existants
 
 1. **Migration Automatique**
-
    - Le script détecte automatiquement le nouveau chemin
    - Pas d'intervention manuelle requise
 
@@ -160,3 +156,13 @@ cleanup_stale_processes() {
 Cette migration résout définitivement le problème d'accessibilité multi-utilisateur tout en maintenant l'isolation et la sécurité. L'architecture est maintenant conforme aux standards Unix et robuste en environnement partagé.
 
 **Status**: ✅ Migration Complète - Solution Fonctionnelle Multi-Utilisateur
+
+## Compatibilité OS et NFS (postes 42)
+
+La nouvelle architecture `/tmp/$USER` présente trois propriétés alignées avec l'infrastructure 42 :
+
+- **`$HOME` partagé NFS** entre tous les postes : le `~/.zshrc` déployé est le même partout, donc `$STUDENT_WORKSPACE` dérivé de `$USER` reste cohérent quelle que soit la machine.
+- **`/tmp` local par machine** : chaque poste repart d'un workspace vide, ce qui évite les conflits d'état entre sessions simultanées.
+- **Dual OS Ubuntu + Fedora** : la migration école est en cours, Fedora = cible finale. Aucun chemin dépendant de la distribution - le script `Deploy.sh` utilise `grep -Eq "^ID=(ubuntu|fedora)" /etc/os-release` pour valider le prérequis.
+
+Les redirections portables (Claude Code via `~/.local/share/claude`, caches VS Code via `STUDENT_USE_PORTABLE_CACHE`) s'appuient sur cette invariance de `$USER` et fonctionnent transparentement lors d'une bascule Ubuntu↔Fedora.
