@@ -124,9 +124,50 @@ export AUTO_INSTALL_BREW=${AUTO_INSTALL_BREW:-1}  # Valeur par défaut: installa
 export ASYNC_SETUP=${ASYNC_SETUP:-0}  # Valeur par défaut: setup synchrone pour première installation
 export DISABLE_SETUP=${DISABLE_SETUP:-0}  # Valeur par défaut: setup automatique activé
 
+# Détection OS (Ubuntu / Fedora) — utilisée pour les comportements spécifiques
+# (création de dossiers VS Code attendus sur Fedora, routage toolbox, etc.)
+if [[ -r /etc/os-release ]]; then
+    export STUDENT_OS_ID=$(. /etc/os-release 2>/dev/null; printf '%s' "${ID:-unknown}")
+else
+    export STUDENT_OS_ID="unknown"
+fi
+# Nom du conteneur Toolbox utilisé sur Fedora pour fournir les outils manquants (ocaml, rlwrap, etc.)
+export STUDENT_TOOLBOX_NAME="${STUDENT_TOOLBOX_NAME:-student-dev}"
+
 # Configuration Node.js et npm dans /tmp/USERNAME (sans sudo)
 # Dynamic user workspace - accessible to all users
 export STUDENT_WORKSPACE="/tmp/${USER:-$(whoami)}"
+
+# Fedora: rediriger le stockage Podman/Toolbox vers /tmp/$USER pour respecter la contrainte NFS.
+# Évite que les images de base et le conteneur Toolbox (plusieurs centaines de Mo) saturent le quota.
+if [[ "$STUDENT_OS_ID" == "fedora" ]]; then
+    export CONTAINERS_STORAGE_CONF="$STUDENT_WORKSPACE/containers/storage.conf"
+fi
+
+# Génère (si absent) le fichier storage.conf Podman pointant graphroot/runroot vers /tmp/$USER.
+# Idempotent : ne récrit pas si le fichier existe déjà avec le bon chemin.
+_ensure_toolbox_storage() {
+    [[ "$STUDENT_OS_ID" != "fedora" ]] && return 0
+    local conf="$CONTAINERS_STORAGE_CONF"
+    local graphroot="$STUDENT_WORKSPACE/containers/storage"
+    local runroot="$STUDENT_WORKSPACE/containers/runroot"
+    mkdir -p "$graphroot" "$runroot" "${conf%/*}" 2>/dev/null || return 1
+    if [[ ! -f "$conf" ]] || ! grep -q "graphroot = \"$graphroot\"" "$conf" 2>/dev/null; then
+        cat > "$conf" <<EOF
+[storage]
+driver = "overlay"
+graphroot = "$graphroot"
+runroot = "$runroot"
+
+[storage.options]
+additionalimagestores = []
+
+[storage.options.overlay]
+mountopt = "nodev,metacopy=on"
+EOF
+    fi
+    return 0
+}
 export N_PREFIX="$STUDENT_WORKSPACE/node"
 export PATH="$STUDENT_WORKSPACE/node/bin:$STUDENT_WORKSPACE/npm-global/bin:$PATH"
 
@@ -206,6 +247,20 @@ export CONDA_ENVS_PATH="$STUDENT_WORKSPACE/.conda/envs"
         ln -sf "$_claude_marketplaces" "$HOME/.claude/plugins/marketplaces"
     }
 }
+
+# Fedora : créer les dossiers attendus par VS Code sous /goinfre/$USER/.config/Code
+# VS Code refuse de démarrer sur Fedora si ces sous-dossiers n'existent pas.
+# Le chemin /goinfre/$USER est imposé par l'installation 42 (hors STUDENT_WORKSPACE).
+# Opération idempotente et silencieuse (mkdir -p).
+if [[ "$STUDENT_OS_ID" == "fedora" ]]; then
+    local _goinfre_user="/goinfre/${USER:-$(id -un)}"
+    if [[ -w "$(dirname "$_goinfre_user")" ]] 2>/dev/null || [[ -d "$_goinfre_user" ]]; then
+        mkdir -p "$_goinfre_user/.config/Code/Cache" \
+                 "$_goinfre_user/.config/Code/CachedExtensionVSIXs" \
+                 "$_goinfre_user/.config/Code/Service Worker" \
+                 "$_goinfre_user/.config/Code/CachedData" 2>/dev/null
+    fi
+fi
 
 # Redirection des caches régénérables VS Code vers /tmp (ZÉRO IMPACT UTILISATEUR)
 # Seuls les dossiers 100% régénérables sont ciblés :
@@ -643,19 +698,30 @@ PyNormInstall() {
 }
 
 rlwrap() {
+    # Sur Fedora : si rlwrap n'est pas sur le PATH, router via Toolbox (stockage déjà
+    # redirigé vers $STUDENT_WORKSPACE/containers via CONTAINERS_STORAGE_CONF).
+    if [[ "$STUDENT_OS_ID" == "fedora" ]] && ! command -v rlwrap >/dev/null 2>&1; then
+        if command -v toolbox >/dev/null 2>&1 && toolbox list -c 2>/dev/null | grep -q "$STUDENT_TOOLBOX_NAME"; then
+            toolbox run -c "$STUDENT_TOOLBOX_NAME" rlwrap "$@"
+            return $?
+        fi
+        echo "❌ rlwrap indisponible sur Fedora. Lancez: OCamlInstall" >&2
+        return 1
+    fi
+
     local brew_installed=$(command -v brew 2>/dev/null)
-    
+
     if [[ -z "$brew_installed" ]]; then
         echo "❌ Erreur: Homebrew n'est pas installé. Veuillez l'installer d'abord." >&2
         return 1
     fi
-    
+
     # Vérifier spécifiquement l'exécutable rlwrap dans les emplacements Homebrew
     local rlwrap_locations=(
         "$STUDENT_WORKSPACE/homebrew/bin/rlwrap"   # Homebrew portable utilisateur
         "$(brew --prefix 2>/dev/null)/bin/rlwrap"  # Homebrew système
     )
-    
+
     local rlwrap_found=""
     for location in "${rlwrap_locations[@]}"; do
         if [[ -n "$location" && -x "$location" ]]; then
@@ -663,7 +729,7 @@ rlwrap() {
             break
         fi
     done
-    
+
     if [[ -z "$rlwrap_found" ]]; then
         echo "❓ rlwrap n'est pas installé via Homebrew. Voulez-vous l'installer ? (Y/n)"
         read -r answer
@@ -685,7 +751,7 @@ rlwrap() {
             return 1
         fi
     fi
-    
+
     if [[ -n "$rlwrap_found" ]]; then
         echo "🔧 Utilisation de: $rlwrap_found"
         command rlwrap "$@"
@@ -694,6 +760,28 @@ rlwrap() {
         return 1
     fi
 }
+
+# Wrappers OCaml : transparents sur Ubuntu (binaire natif via brew),
+# routés via Toolbox sur Fedora si le binaire est absent du PATH.
+# Usage inchangé : `ocamlopt -c atom.ml`, `ocaml`, `ocamlc foo.ml`, etc.
+_ocaml_dispatch() {
+    local cmd="$1"; shift
+    if command -v "$cmd" >/dev/null 2>&1; then
+        command "$cmd" "$@"
+        return $?
+    fi
+    if [[ "$STUDENT_OS_ID" == "fedora" ]] && command -v toolbox >/dev/null 2>&1 \
+        && toolbox list -c 2>/dev/null | grep -q "$STUDENT_TOOLBOX_NAME"; then
+        toolbox run -c "$STUDENT_TOOLBOX_NAME" "$cmd" "$@"
+        return $?
+    fi
+    echo "❌ $cmd indisponible. Lancez: OCamlInstall" >&2
+    return 127
+}
+ocaml()     { _ocaml_dispatch ocaml     "$@"; }
+ocamlopt()  { _ocaml_dispatch ocamlopt  "$@"; }
+ocamlc()    { _ocaml_dispatch ocamlc    "$@"; }
+ocamlfind() { _ocaml_dispatch ocamlfind "$@"; }
 
 # Alias pour ouvrir un répertoire temporaire dans VS Code
 # Usage: STmp [chemin]
@@ -1448,6 +1536,61 @@ ClaudeInstall() {
     fi
 }
 
+# Installation OCaml + rlwrap, cross-OS
+#   Ubuntu : via Homebrew (reste cohérent avec le flux actuel).
+#   Fedora : via Toolbox, avec stockage Podman redirigé vers $STUDENT_WORKSPACE/containers
+#            (CONTAINERS_STORAGE_CONF) pour respecter le quota NFS.
+# Après installation, les wrappers ocaml/ocamlopt/ocamlc/ocamlfind/rlwrap routent
+# automatiquement vers le binaire natif (Ubuntu) ou vers `toolbox run` (Fedora).
+OCamlInstall() {
+    echo "🐫 Installation de l'environnement OCaml..."
+
+    if [[ "$STUDENT_OS_ID" == "fedora" ]]; then
+        if ! command -v toolbox >/dev/null 2>&1; then
+            logs_error "La commande 'toolbox' est absente. Installe-la (dnf install toolbox) avant de relancer."
+            return 1
+        fi
+        _ensure_toolbox_storage || { logs_error "Impossible de préparer $STUDENT_WORKSPACE/containers"; return 1; }
+        echo "📦 Stockage Podman redirigé vers $STUDENT_WORKSPACE/containers (quota NFS préservé)"
+
+        if ! toolbox list -c 2>/dev/null | grep -q "$STUDENT_TOOLBOX_NAME"; then
+            echo "🔧 Création du conteneur Toolbox '$STUDENT_TOOLBOX_NAME'..."
+            if ! toolbox create -y -c "$STUDENT_TOOLBOX_NAME" >/dev/null; then
+                logs_error "Échec de la création du conteneur Toolbox"
+                return 1
+            fi
+        else
+            echo "ℹ️  Conteneur Toolbox '$STUDENT_TOOLBOX_NAME' déjà présent"
+        fi
+
+        echo "📥 Installation de ocaml + rlwrap dans le conteneur..."
+        if toolbox run -c "$STUDENT_TOOLBOX_NAME" sudo dnf install -y \
+            ocaml ocaml-compiler-libs ocaml-findlib rlwrap; then
+            logs_success "OCaml + rlwrap installés dans '$STUDENT_TOOLBOX_NAME'"
+            echo "💡 Testez : ocamlopt -c fichier.ml   (routé via toolbox run)"
+            echo "💡 Testez : rlwrap ocaml"
+            return 0
+        else
+            logs_error "Échec de l'installation OCaml via dnf dans le toolbox"
+            return 1
+        fi
+    fi
+
+    # Branche Ubuntu (ou tout OS où brew est installé)
+    if ! command -v brew >/dev/null 2>&1; then
+        logs_error "Homebrew absent. Exécute: bash scripts/BrewInstaller.sh"
+        return 1
+    fi
+    echo "📥 Installation de ocaml + rlwrap via Homebrew..."
+    if brew install ocaml rlwrap; then
+        logs_success "OCaml + rlwrap installés via Homebrew"
+        return 0
+    else
+        logs_error "Échec de l'installation via Homebrew"
+        return 1
+    fi
+}
+
 # Fonction étendue DevInstall avec support IDE
 DevInstall() {
     local tool="$1"
@@ -1477,6 +1620,9 @@ DevInstall() {
         "claude")
             ClaudeInstall
             ;;
+        "ocaml")
+            OCamlInstall
+            ;;
         "all")
             echo "🚀 Installation complète des outils de développement..."
             JavaInstall
@@ -1486,6 +1632,7 @@ DevInstall() {
             PoetryInstall
             SetupIDEEnvironment
             ClaudeInstall
+            OCamlInstall
             echo "✅ Installation terminée. Redémarrez votre terminal."
             ;;
         *)

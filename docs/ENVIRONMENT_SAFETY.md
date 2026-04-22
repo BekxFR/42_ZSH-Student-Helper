@@ -65,9 +65,45 @@ export STUDENT_USE_PORTABLE_VSCODE=0    # VS Code : définit uniquement VSCODE_P
                                          # Pour les caches seulement, voir STUDENT_USE_PORTABLE_CACHE.
 export STUDENT_USE_PORTABLE_IDEA=0      # IntelliJ portable
 export STUDENT_USE_PORTABLE_CLAUDE=0    # Claude Code portable (symlinks ~/.local/share/claude)
-export STUDENT_USE_PORTABLE_CACHE=0     # Caches VS Code régénérables (Crashpad, GPUCache, logs) - zéro impact
+export STUDENT_USE_PORTABLE_CACHE=1     # Caches VS Code régénérables (Crashpad, GPUCache, logs,
+                                         # CachedProfilesData, DawnWebGPUCache, DawnGraphiteCache)
+                                         # ACTIF PAR DÉFAUT (opt-out) : zéro impact utilisateur,
+                                         # gain quota NFS immédiat. WebStorage/User/globalStorage
+                                         # restent exclus (sessions d'auth webview préservées).
 export STUDENT_USE_PORTABLE_XDG=0       # Variables XDG (DANGEREUX!)
 ```
+
+### Variables Fedora / Toolbox (auto-détectées)
+
+Ces variables sont définies automatiquement selon l'OS détecté (`/etc/os-release`) — pas besoin de les exporter manuellement :
+
+```bash
+STUDENT_OS_ID                  # "ubuntu" | "fedora" | "unknown" (lecture /etc/os-release)
+STUDENT_TOOLBOX_NAME           # Nom du conteneur Toolbox Fedora (défaut : "student-dev")
+CONTAINERS_STORAGE_CONF        # Défini UNIQUEMENT sur Fedora :
+                               #   $STUDENT_WORKSPACE/containers/storage.conf
+                               # Redirige le graphroot/runroot Podman vers /tmp/$USER
+                               # (généré à la demande par _ensure_toolbox_storage)
+```
+
+Comportements spécifiques Fedora (sans flag à activer) :
+
+1. **Pré-création VS Code** : `/goinfre/$USER/.config/Code/{Cache,CachedExtensionVSIXs,Service Worker,CachedData}` est créé automatiquement à chaque ouverture de shell (sinon VS Code refuse de démarrer sur les postes Fedora 42).
+2. **Stockage Podman/Toolbox dans /tmp** : toutes les images, layers et rootfs de conteneurs Toolbox sont stockés sous `$STUDENT_WORKSPACE/containers/` — quota NFS préservé.
+3. **Outils manquants via Toolbox** : sur Fedora, les commandes `ocaml`, `ocamlopt`, `ocamlc`, `ocamlfind`, `rlwrap` sont routées automatiquement vers `toolbox run -c "$STUDENT_TOOLBOX_NAME"` si le binaire natif est absent.
+
+Pour provisionner l'environnement OCaml (Ubuntu ou Fedora) :
+
+```bash
+OCamlInstall                   # Ubuntu  : brew install ocaml rlwrap
+                               # Fedora  : toolbox create -y -c $STUDENT_TOOLBOX_NAME
+                               #           puis dnf install ocaml ocaml-compiler-libs
+                               #           ocaml-findlib rlwrap dans le conteneur
+# ou via le dispatcher :
+DevInstall ocaml
+```
+
+Après installation, l'usage est identique sur les deux OS : `ocamlopt -c atom.ml`, `rlwrap ocaml`, etc.
 
 > **Compatibilité OS** : l'ensemble du projet supporte Ubuntu 20.04+ **et Fedora**. Le `$HOME` étant partagé NFS entre postes, tous les symlinks portables ciblent `/tmp/$USER` (path déterministe) pour rester valides lors d'une bascule Ubuntu↔Fedora.
 

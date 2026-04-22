@@ -9,8 +9,8 @@ Ce projet fournit une configuration ZSH complète avec Oh-My-Zsh, le thème Agno
 
 - **Installation automatique** : Un seul script pour tout configurer
 - **Optimisation espace** : Utilise un espace de travail utilisateur dynamique `/tmp/$USER` pour économiser l'espace et éviter les collisions
-- **Caches régénérables portables** : Flag `STUDENT_USE_PORTABLE_CACHE` + alias `cache_on`/`cache_off` pour rediriger les caches VS Code (`Crashpad`, `GPUCache`, `logs`, etc.) vers `/tmp/$USER/vscode-cache` 
-- **zéro impact utilisateur** (pas de reconnexion, pas de perte de config). Voir [PORTABLE_USAGE_GUIDE.md](docs/PORTABLE_USAGE_GUIDE.md).
+- **Caches régénérables portables** : Flag `STUDENT_USE_PORTABLE_CACHE` **actif par défaut (opt-out)** + alias `cache_on`/`cache_off`/`cache_status` pour rediriger les caches VS Code (`Crashpad`, `GPUCache`, `logs`, `CachedProfilesData`, `DawnWebGPUCache`, `DawnGraphiteCache`) vers `/tmp/$USER/vscode-cache`
+- **zéro impact utilisateur** (pas de reconnexion, pas de perte de config, `WebStorage/User/globalStorage` exclus). Voir [PORTABLE_USAGE_GUIDE.md](docs/PORTABLE_USAGE_GUIDE.md).
 - **Isolation utilisateur** : Chaque utilisateur dispose de son propre environnement temporaire sécurisé
 - **Setup intelligent** : Configuration automatique de Homebrew et des outils essentiels
 - **Prêt à l'emploi** : Aliases et fonctions pratiques pour le développement

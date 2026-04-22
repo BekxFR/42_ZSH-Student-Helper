@@ -33,6 +33,15 @@ There is no Makefile, CI/CD, linter, or build system.
 
 Each user gets an isolated workspace at `/tmp/$USER` (set via `STUDENT_WORKSPACE`). All portable tools (Homebrew, Node.js, Java, Rust, Go, Cargo, Poetry, Claude Code) install there, avoiding home directory quota consumption. The `/tmp` sticky bit (1777) prevents cross-user access. Claude Code uses symlinks (`~/.local/share/claude`, `~/.cache/claude`) to redirect its data transparently. VS Code regenerable caches (`Crashpad/`, `GPUCache/`, `logs/`, `CachedProfilesData/`, `Dawn*Cache/`) can be symlinked to `$STUDENT_WORKSPACE/vscode-cache/` via the `STUDENT_USE_PORTABLE_CACHE` flag - deliberately excludes `User/`, `WebStorage/`, `globalStorage/` to preserve settings and extension auth.
 
+### OS detection & Fedora/Toolbox integration
+
+The config detects the running distro via `/etc/os-release` and exports `STUDENT_OS_ID` (values: `ubuntu`, `fedora`, `unknown`). Fedora-specific behaviour:
+
+- **VS Code auto-mkdir**: each shell source creates `/goinfre/$USER/.config/Code/{Cache,CachedExtensionVSIXs,Service Worker,CachedData}` if missing — without these subfolders VS Code refuses to launch on 42 Fedora workstations. Not a flag, it's a hard system prerequisite.
+- **Podman/Toolbox storage redirection**: on Fedora, `CONTAINERS_STORAGE_CONF` points at `$STUDENT_WORKSPACE/containers/storage.conf`, generated on-demand by `_ensure_toolbox_storage()`. All Podman/Toolbox data (images, layers, container rootfs) lives under `/tmp/$USER/containers/` — preserves the NFS quota.
+- **Toolbox-backed tool provisioning**: the container name is `STUDENT_TOOLBOX_NAME` (default `student-dev`). `OCamlInstall()` provisions OCaml + `rlwrap` inside this container on Fedora (`toolbox create -y -c ... && toolbox run -c ... sudo dnf install -y ocaml ocaml-compiler-libs ocaml-findlib rlwrap`). On Ubuntu the same function uses `brew install ocaml rlwrap`.
+- **Transparent wrappers**: `ocaml`, `ocamlopt`, `ocamlc`, `ocamlfind`, `rlwrap` are shell functions that call the native binary if available (Ubuntu brew path) and otherwise route via `toolbox run -c "$STUDENT_TOOLBOX_NAME"` on Fedora. Usage (`ocamlopt -c atom.ml`, `rlwrap ocaml`) is identical on both OSes.
+
 ### Conditional activation pattern
 
 Portable features are opt-in via flags. Nothing modifies the user environment unless explicitly enabled:
@@ -41,7 +50,7 @@ Portable features are opt-in via flags. Nothing modifies the user environment un
 [[ "$STUDENT_USE_PORTABLE_JAVA" == "1" ]] && export JAVA_HOME="$STUDENT_WORKSPACE/java"
 ```
 
-Flags: `STUDENT_USE_PORTABLE_JAVA`, `_PYTHON`, `_DOCKER`, `_VAGRANT`, `_VSCODE`, `_IDEA`, `_CLAUDE`, `_CACHE`, `_XDG` (all default to 0). Toggle aliases follow the `*_on` / `*_off` / `*_status` pattern (`cache_on`, `claude_on`, `docker_on`, etc.). **Note on `_VSCODE`**: only defines `VSCODE_PORTABLE_EXTENSIONS` as the candidate path for the opt-in `code-portable` alias and `VSCodeExtensionsInstall` function. The previous `code` wrapper injecting `--extensions-dir`/`--user-data-dir` has been removed because it forced extension reinstallation on every workstation switch. Use `_CACHE` to redirect only regenerable VS Code caches.
+Flags: `STUDENT_USE_PORTABLE_JAVA`, `_PYTHON`, `_DOCKER`, `_VAGRANT`, `_VSCODE`, `_IDEA`, `_CLAUDE`, `_CACHE`, `_XDG`. Tous par défaut à `0` **sauf `_CACHE` qui est à `1` par défaut** (opt-out) : les 6 dossiers ciblés sont 100% régénérables et le gain quota NFS est immédiat sans friction utilisateur. Toggle aliases follow the `*_on` / `*_off` / `*_status` pattern (`cache_on`, `claude_on`, `docker_on`, etc.). **Note on `_VSCODE`**: only defines `VSCODE_PORTABLE_EXTENSIONS` as the candidate path for the opt-in `code-portable` alias and `VSCodeExtensionsInstall` function. The previous `code` wrapper injecting `--extensions-dir`/`--user-data-dir` has been removed because it forced extension reinstallation on every workstation switch. Use `_CACHE` to redirect only regenerable VS Code caches. `WebStorage/`, `User/`, `globalStorage/` restent exclus pour préserver les sessions d'auth webview (Copilot Chat, Claude, Remote SSH, etc.).
 
 ### Setup modes
 
