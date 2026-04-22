@@ -105,6 +105,27 @@ DevInstall ocaml
 
 Après installation, l'usage est identique sur les deux OS : `ocamlopt -c atom.ml`, `rlwrap ocaml`, etc.
 
+#### Usage portable sur poste Fedora etranger
+
+Le script `scripts/tb-ocaml.sh` fonctionne **sans** avoir deploye le projet :
+copie-le simplement sur le poste cible et utilise :
+
+```bash
+chmod +x tb-ocaml.sh
+./tb-ocaml.sh setup              # cree le toolbox + installe ocaml/rlwrap/make (~500 Mo sous /tmp)
+./tb-ocaml.sh status             # verifie l'etat et l'espace occupe
+cd /tmp/$USER/GitOcaml/21/ex00
+/path/to/tb-ocaml.sh make        # compile via le toolbox, cwd preservee
+/path/to/tb-ocaml.sh make test   # execute la cible test du Makefile
+/path/to/tb-ocaml.sh rlwrap ocaml  # REPL OCaml interactif
+/path/to/tb-ocaml.sh clean       # fin de TP : libere tout l'espace disque
+```
+
+Le stockage (images + conteneur) reste dans `/tmp/$USER/containers/` via `CONTAINERS_STORAGE_CONF`
+genere a la volee par le script : le quota NFS est preserve meme sur un poste ou le `.zshrc`
+du projet n'a pas ete deploye. Variables respectees : `STUDENT_TOOLBOX_NAME` (defaut `student-dev`),
+`STUDENT_WORKSPACE` (defaut `/tmp/$USER`).
+
 > **Compatibilité OS** : l'ensemble du projet supporte Ubuntu 20.04+ **et Fedora**. Le `$HOME` étant partagé NFS entre postes, tous les symlinks portables ciblent `/tmp/$USER` (path déterministe) pour rester valides lors d'une bascule Ubuntu↔Fedora.
 
 ### Modes de Configuration
