@@ -144,6 +144,26 @@ if [[ "$STUDENT_OS_ID" == "fedora" ]]; then
     export CONTAINERS_STORAGE_CONF="$STUDENT_WORKSPACE/containers/storage.conf"
 fi
 
+# Génère dans $STUDENT_WORKSPACE/bin/ des shims exécutables pour les commandes
+# fournies par le conteneur Toolbox. Nécessaire pour que `make`, `dune`, ou tout
+# sous-processus (qui n'hérite pas des fonctions zsh) trouve `ocamlopt`/`ocaml`/etc.
+# sur le PATH. Chaque shim fait `exec toolbox run -c $STUDENT_TOOLBOX_NAME <cmd> "$@"`.
+_ensure_toolbox_shims() {
+    [[ "$STUDENT_OS_ID" != "fedora" ]] && return 0
+    local bin_dir="$STUDENT_WORKSPACE/bin"
+    mkdir -p "$bin_dir" 2>/dev/null || return 1
+    local cmd
+    for cmd in ocaml ocamlopt ocamlc ocamlfind rlwrap; do
+        local shim="$bin_dir/$cmd"
+        cat > "$shim" <<EOF
+#!/bin/sh
+exec toolbox run -c "\${STUDENT_TOOLBOX_NAME:-student-dev}" $cmd "\$@"
+EOF
+        chmod +x "$shim"
+    done
+    return 0
+}
+
 # Génère (si absent) le fichier storage.conf Podman pointant graphroot/runroot vers /tmp/$USER.
 # Idempotent : ne récrit pas si le fichier existe déjà avec le bon chemin.
 _ensure_toolbox_storage() {
@@ -173,6 +193,11 @@ export PATH="$STUDENT_WORKSPACE/node/bin:$STUDENT_WORKSPACE/npm-global/bin:$PATH
 
 # Binaires utilisateur locaux (Claude Code, pip --user, etc.)
 export PATH="$HOME/.local/bin:$PATH"
+
+# Shims portables ($STUDENT_WORKSPACE/bin) — contient les wrappers "ocamlopt/ocaml/rlwrap/..."
+# générés sur Fedora par OCamlInstall. Placé en tête de PATH pour que `make` et autres
+# sous-processus trouvent les commandes routées vers Toolbox sans dépendre des fonctions zsh.
+export PATH="$STUDENT_WORKSPACE/bin:$PATH"
 
 # Configuration étendue pour outils de développement modernes (VERSION SÉCURISÉE)
 # Variables conditionnelles pour préserver les configurations existantes
@@ -1567,7 +1592,8 @@ OCamlInstall() {
         if toolbox run -c "$STUDENT_TOOLBOX_NAME" sudo dnf install -y \
             ocaml ocaml-compiler-libs ocaml-findlib rlwrap; then
             logs_success "OCaml + rlwrap installés dans '$STUDENT_TOOLBOX_NAME'"
-            echo "💡 Testez : ocamlopt -c fichier.ml   (routé via toolbox run)"
+            _ensure_toolbox_shims || logs_warning "Shims non générés — make/Makefile pourraient ne pas trouver ocamlopt"
+            echo "💡 Testez : ocamlopt -c fichier.ml   (routé via toolbox run, visible par make)"
             echo "💡 Testez : rlwrap ocaml"
             return 0
         else
