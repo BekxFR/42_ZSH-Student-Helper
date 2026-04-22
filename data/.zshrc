@@ -1581,7 +1581,7 @@ export STUDENT_USE_PORTABLE_VAGRANT=${STUDENT_USE_PORTABLE_VAGRANT:-0}
 export STUDENT_USE_PORTABLE_VSCODE=${STUDENT_USE_PORTABLE_VSCODE:-0}
 export STUDENT_USE_PORTABLE_IDEA=${STUDENT_USE_PORTABLE_IDEA:-0}
 export STUDENT_USE_PORTABLE_CLAUDE=${STUDENT_USE_PORTABLE_CLAUDE:-0}
-export STUDENT_USE_PORTABLE_CACHE=${STUDENT_USE_PORTABLE_CACHE:-0}
+export STUDENT_USE_PORTABLE_CACHE=${STUDENT_USE_PORTABLE_CACHE:-1}
 export STUDENT_USE_PORTABLE_XDG=${STUDENT_USE_PORTABLE_XDG:-0}
 
 # Fonction de diagnostic rapide
@@ -1686,9 +1686,9 @@ ConfigurePortableEnvironment() {
     [[ "$claude_choice" =~ ^[Yy]$ ]] && export STUDENT_USE_PORTABLE_CLAUDE=1 || export STUDENT_USE_PORTABLE_CLAUDE=0
 
     # Caches VS Code régénérables
-    echo -n "8. Caches VS Code régénérables portables (Crashpad/GPUCache/logs, zéro perte) [y/N]: "
+    echo -n "8. Caches VS Code régénérables portables (Crashpad/GPUCache/logs, zéro perte) [Y/n]: "
     read -r cache_choice
-    [[ "$cache_choice" =~ ^[Yy]$ ]] && export STUDENT_USE_PORTABLE_CACHE=1 || export STUDENT_USE_PORTABLE_CACHE=0
+    [[ "$cache_choice" =~ ^[Nn]$ ]] && export STUDENT_USE_PORTABLE_CACHE=0 || export STUDENT_USE_PORTABLE_CACHE=1
 
     # XDG (CRITIQUE)
     echo ""
