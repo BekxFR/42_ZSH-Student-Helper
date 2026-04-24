@@ -276,36 +276,52 @@ export CONDA_ENVS_PATH="$STUDENT_WORKSPACE/.conda/envs"
 # Fedora : créer les dossiers attendus par VS Code sous /goinfre/$USER/.config/Code
 # VS Code refuse de démarrer sur Fedora si ces sous-dossiers n'existent pas.
 # Le chemin /goinfre/$USER est imposé par l'installation 42 (hors STUDENT_WORKSPACE).
-# Opération idempotente et silencieuse (mkdir -p).
-if [[ "$STUDENT_OS_ID" == "fedora" ]]; then
+#
+# Implémentation en fonction (et non bloc inline) pour :
+#   1. Permettre l'usage légitime de `local` (zsh interdit `local` hors fonction).
+#   2. Garantir l'exécution du mkdir sans dépendance à un guard d'écriture
+#      (mkdir -p ... 2>/dev/null est intrinsèquement idempotent et silencieux).
+_ensure_fedora_goinfre_vscode_dirs() {
+    [[ "$STUDENT_OS_ID" == "fedora" ]] || return 0
     local _goinfre_user="/goinfre/${USER:-$(id -un)}"
-    if [[ -w "$(dirname "$_goinfre_user")" ]] 2>/dev/null || [[ -d "$_goinfre_user" ]]; then
-        mkdir -p "$_goinfre_user/.config/Code/Cache" \
-                 "$_goinfre_user/.config/Code/CachedExtensionVSIXs" \
-                 "$_goinfre_user/.config/Code/Service Worker" \
-                 "$_goinfre_user/.config/Code/CachedData" 2>/dev/null
-    fi
-fi
+    mkdir -p "$_goinfre_user/.config/Code/Cache" \
+             "$_goinfre_user/.config/Code/CachedExtensionVSIXs" \
+             "$_goinfre_user/.config/Code/Service Worker" \
+             "$_goinfre_user/.config/Code/CachedData" 2>/dev/null
+}
+_ensure_fedora_goinfre_vscode_dirs
 
 # Redirection des caches régénérables VS Code vers /tmp (ZÉRO IMPACT UTILISATEUR)
 # Seuls les dossiers 100% régénérables sont ciblés :
 #   - Crashpad, GPUCache, logs, CachedProfilesData, DawnWebGPUCache, DawnGraphiteCache
 # Exclus volontairement : User/ (settings, snippets, History, workspaceStorage),
 # WebStorage (risque d'authentification d'extensions), globalStorage (tokens).
-[[ "$STUDENT_USE_PORTABLE_CACHE" == "1" ]] && {
-    local _vscode_cache_root="$STUDENT_WORKSPACE/vscode-cache"
-    local _vscode_config="$HOME/.config/Code"
-    if [[ -d "$_vscode_config" ]]; then
-        local _cache_dir
-        for _cache_dir in Crashpad GPUCache logs CachedProfilesData DawnWebGPUCache DawnGraphiteCache; do
-            mkdir -p "$_vscode_cache_root/$_cache_dir" 2>/dev/null
-            if [[ ! -L "$_vscode_config/$_cache_dir" ]]; then
-                rm -rf "$_vscode_config/$_cache_dir" 2>/dev/null
-                ln -sf "$_vscode_cache_root/$_cache_dir" "$_vscode_config/$_cache_dir"
-            fi
-        done
-    fi
+#
+# Implémentation en fonction (et non bloc inline) pour :
+#   1. Permettre l'usage légitime de `local` (zsh interdit `local` hors fonction).
+#   2. Réparer les symlinks cassés ou pointant vers une cible obsolète
+#      (`[[ -L ]]` seul reste vrai sur un lien dangling → bug de non-réparation).
+_ensure_vscode_cache_symlinks() {
+    [[ "$STUDENT_USE_PORTABLE_CACHE" == "1" ]] || return 0
+    local _root="$STUDENT_WORKSPACE/vscode-cache"
+    local _cfg="$HOME/.config/Code"
+    [[ -d "$_cfg" ]] || return 0
+    local _d _link _target _current
+    for _d in Crashpad GPUCache logs CachedProfilesData DawnWebGPUCache DawnGraphiteCache; do
+        _target="$_root/$_d"
+        _link="$_cfg/$_d"
+        mkdir -p "$_target" 2>/dev/null || continue
+        _current=""
+        [[ -L "$_link" ]] && _current="$(readlink "$_link" 2>/dev/null)"
+        # Réparer si : lien absent, cassé, ou pointant ailleurs que la cible attendue.
+        # Le trailing "/" force le déréférencement et retourne faux sur lien cassé.
+        if [[ "$_current" != "$_target" ]] || [[ ! -d "$_link/" ]]; then
+            rm -rf "$_link" 2>/dev/null
+            ln -sfn "$_target" "$_link"
+        fi
+    done
 }
+_ensure_vscode_cache_symlinks
 
 # Configuration des caches génériques XDG (CRITIQUE - PROTECTION MAXIMALE)
 # Ces variables ne sont définies que si explicitement demandées car elles affectent TOUTES les applications
@@ -390,7 +406,7 @@ alias claude_status='echo "🤖 Claude portable  : ${STUDENT_USE_PORTABLE_CLAUDE
 
 # Contrôle des caches régénérables (VS Code) - zéro impact utilisateur
 # Symlinks vers /tmp pour Crashpad, GPUCache, logs, CachedProfilesData, Dawn*Cache
-alias cache_on='export STUDENT_USE_PORTABLE_CACHE=1 && { _vcr="$STUDENT_WORKSPACE/vscode-cache"; _vcc="$HOME/.config/Code"; if [[ -d "$_vcc" ]]; then for _d in Crashpad GPUCache logs CachedProfilesData DawnWebGPUCache DawnGraphiteCache; do mkdir -p "$_vcr/$_d" 2>/dev/null; [[ ! -L "$_vcc/$_d" ]] && { rm -rf "$_vcc/$_d" 2>/dev/null; ln -sf "$_vcr/$_d" "$_vcc/$_d"; }; done; fi; unset _vcr _vcc _d; }; echo "🧹 Caches régénérables VS Code redirigés vers /tmp (aucun impact utilisateur)"'
+alias cache_on='export STUDENT_USE_PORTABLE_CACHE=1 && _ensure_vscode_cache_symlinks && echo "🧹 Caches régénérables VS Code redirigés vers /tmp (aucun impact utilisateur)"'
 alias cache_off='export STUDENT_USE_PORTABLE_CACHE=0 && { _vcc="$HOME/.config/Code"; for _d in Crashpad GPUCache logs CachedProfilesData DawnWebGPUCache DawnGraphiteCache; do [[ -L "$_vcc/$_d" ]] && { rm -f "$_vcc/$_d"; mkdir -p "$_vcc/$_d"; }; done; unset _vcc _d; }; echo "🧹 Caches VS Code restaurés dans ~/.config/Code (redémarrez VS Code)"'
 alias cache_status='echo "🧹 Cache portable   : ${STUDENT_USE_PORTABLE_CACHE:-0} $([ "${STUDENT_USE_PORTABLE_CACHE:-0}" = "1" ] && echo "✅ VS Code caches → $STUDENT_WORKSPACE/vscode-cache" || echo "❌ (défaut: ~/.config/Code)")"'
 
