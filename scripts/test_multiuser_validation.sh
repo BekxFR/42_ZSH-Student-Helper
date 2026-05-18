@@ -109,17 +109,28 @@ echo "Test 5: Validation configuration workspace"
 echo "------------------------------------------"
 
 # Source le .zshrc en mode bash (limitation des tests)
-echo "STUDENT_WORKSPACE attendu: /tmp/$CURRENT_USER"
+echo "STUDENT_WORKSPACE attendu: /tmp/$CURRENT_USER ou /goinfre/$CURRENT_USER (postes 42)"
+
+# Recherche du .zshrc source (depuis le repo) plutot que via chemin codé
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ZSHRC_SOURCE="$SCRIPT_DIR/data/.zshrc"
 
 # Test de cohérence avec la configuration
-if source /tmp/tmp/42_ZSH-Student-Helper/data/.zshrc 2>/dev/null; then
+if source "$ZSHRC_SOURCE" 2>/dev/null; then
     echo "Workspace configuré: ${STUDENT_WORKSPACE:-NON DÉFINI}"
-    
-    if [[ "${STUDENT_WORKSPACE}" == "/tmp/$CURRENT_USER" ]]; then
-        echo "✅ Configuration workspace correcte"
-    else
-        echo "❌ Configuration workspace incorrecte"
-    fi
+    echo "Type détecté: ${STUDENT_WORKSPACE_KIND:-non défini}"
+
+    case "${STUDENT_WORKSPACE}" in
+        "/tmp/$CURRENT_USER")
+            echo "✅ Configuration workspace correcte (base /tmp, fallback hors-42)"
+            ;;
+        "/goinfre/$CURRENT_USER")
+            echo "✅ Configuration workspace correcte (base /goinfre, poste 42 avec persistance)"
+            ;;
+        *)
+            echo "❌ Configuration workspace inattendue: ${STUDENT_WORKSPACE}"
+            ;;
+    esac
 else
     echo "⚠️  Sourcing limité en mode bash"
 fi
@@ -148,7 +159,7 @@ echo
 echo "RÉSUMÉ DES TESTS MULTI-UTILISATEUR"
 echo "==================================="
 
-echo "✅ Architecture /tmp/USERNAME validée"
+echo "✅ Architecture workspace (/tmp ou /goinfre) validée"
 echo "✅ Isolation utilisateur fonctionnelle"
 echo "✅ Permissions appropriées"
 echo "✅ Non-collision des données"
@@ -157,9 +168,11 @@ echo
 
 echo "RECOMMANDATIONS:"
 echo "- La solution est prête pour un environnement multi-utilisateur"
-echo "- Chaque utilisateur a son workspace isolé dans /tmp/USERNAME"
+echo "- Chaque utilisateur a son workspace isolé dans /goinfre/USERNAME (postes 42, persistant)"
+echo "  ou /tmp/USERNAME (fallback, hors-42 ou /goinfre indisponible)"
 echo "- Aucune dépendance aux permissions d'autres utilisateurs"
 echo "- Nettoyage automatique possible via les outils système /tmp"
+echo "- Persistance des installations entre sessions sur le même poste (mode /goinfre)"
 echo
 
-echo "Migration vers /tmp/USERNAME: ✅ VALIDÉE"
+echo "Migration vers workspace adaptatif (/goinfre prioritaire, /tmp fallback): ✅ VALIDÉE"

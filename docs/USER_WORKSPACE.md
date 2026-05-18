@@ -2,50 +2,57 @@
 
 ## 🎯 Vue d'ensemble
 
-Le 42_ZSH Student Helper utilise désormais un système d'espace de travail dynamique et spécifique à chaque utilisateur, remplaçant l'ancien système `/tmp/tmp` partagé par une approche plus robuste `/tmp/tmp/USERNAME`.
+Le 42_ZSH Student Helper utilise un système d'espace de travail dynamique et spécifique à chaque utilisateur, avec **détection automatique** de la base de stockage la plus appropriée : `/goinfre/$USER` en priorité (postes 42, persistant), `/tmp/$USER` en fallback (hors-42 ou `/goinfre` indisponible).
 
 ## 🔄 Évolution de l'Architecture
 
-### Ancien système (v1.x)
+### v3.x — Workspace adaptatif (actuel)
+
 ```bash
-# Espace partagé - risques de collision
-/tmp/tmp/
-├── homebrew/
-├── discord/
-├── node/
-└── .cache/
+# Sélection automatique : /goinfre prioritaire, /tmp fallback
+/goinfre/             # ← Préféré sur postes 42 (persistant, ~50 GB)
+├── alice/            # Utilisateur alice
+│   ├── homebrew/
+│   ├── node/
+│   ├── .cache/
+│   └── containers/   # Images Podman/Toolbox (persistantes entre sessions)
+├── bob/
+└── chillion/
+
+# OU (machine sans /goinfre : laptop perso, Docker, CI)
+/tmp/
+├── alice/            # Volatile (purgé entre sessions)
+├── bob/
+└── chillion/
 ```
 
-### Nouveau système (v2.x+)
-```bash
-# Espaces utilisateur isolés avec fallback intelligent
-/tmp/tmp/
-├── alice/          # Utilisateur alice
-│   ├── homebrew/
-│   ├── discord/
-│   ├── node/
-│   └── .cache/
-├── bob/             # Utilisateur bob
-│   ├── homebrew/
-│   ├── discord/
-│   ├── node/
-│   └── .cache/
-└── [fallback]/      # Espace partagé en cas d'échec
-```
+### v2.x — `/tmp/$USER` (legacy multi-user)
+
+Espaces utilisateur isolés dans `/tmp/$USER` avec sticky bit 1777.
+
+### v1.x — `/tmp/tmp` partagé (obsolète)
+
+Espace partagé sans isolation — risques de collision multi-utilisateur, remplacé en v2.
 
 ## 🚀 Fonctionnalités
 
-### 1. Détection Automatique d'Utilisateur
+### 1. Résolution Automatique du Workspace
+
 ```bash
-# Variable dynamique basée sur l'utilisateur système
-export STUDENT_WORKSPACE="/tmp/tmp/${USER:-$(whoami)}"
+# Au démarrage du shell, _resolve_student_workspace_base() applique :
+#   1. Override : $STUDENT_WORKSPACE_BASE (si défini)
+#   2. /goinfre/$USER si /goinfre est présent + écriture possible (postes 42)
+#   3. /tmp/$USER en fallback (machines sans /goinfre)
+export STUDENT_WORKSPACE="$(_resolve_student_workspace_base)"
+export STUDENT_WORKSPACE_KIND="goinfre"  # ou "tmp" / "custom"
 ```
 
-### 2. Fallback Intelligent
-Si la création du répertoire utilisateur échoue :
-- Tentative de création de `/tmp/tmp/USERNAME`
-- En cas d'échec, fallback vers `/tmp/tmp` (comportement legacy)
-- Logs appropriés pour le débogage
+### 2. Fallback Robuste
+
+Si `/goinfre/$USER` devient inaccessible en cours de session (perms changées, montage instable) :
+- `setup_temp_directories()` bascule automatiquement sur `/tmp/$USER`
+- Aucune intervention utilisateur requise
+- Logs `logs_warning` émis pour traçabilité
 
 ### 3. Isolation des Ressources
 Chaque utilisateur dispose de son propre espace pour :
@@ -59,13 +66,30 @@ Chaque utilisateur dispose de son propre espace pour :
 
 ### Variables d'Environnement
 ```bash
-# Automatiquement configurées
-export STUDENT_WORKSPACE="/tmp/tmp/${USER}"
+# Résolution automatique au sourcing du .zshrc
+export STUDENT_WORKSPACE="$(_resolve_student_workspace_base)"  # /goinfre/$USER ou /tmp/$USER
+export STUDENT_WORKSPACE_KIND="goinfre"   # ou "tmp" / "custom"
+
+# Dérivées (toujours basées sur $STUDENT_WORKSPACE)
 export N_PREFIX="$STUDENT_WORKSPACE/node"
-export XDG_CACHE_HOME="$STUDENT_WORKSPACE/.cache"
-export PYTHONUSERBASE="$STUDENT_WORKSPACE"
+export XDG_CACHE_HOME="$STUDENT_WORKSPACE/.cache"     # si STUDENT_USE_PORTABLE_XDG=1
+export PYTHONUSERBASE="$STUDENT_WORKSPACE"            # si STUDENT_USE_PORTABLE_PYTHON=1
 export PATH="$STUDENT_WORKSPACE/node/bin:$STUDENT_WORKSPACE/npm-global/bin:$PATH"
 ```
+
+### Override manuel
+
+```bash
+# Forcer un chemin spécifique (CI, tests, ou contrainte particulière)
+export STUDENT_WORKSPACE_BASE="/tmp/$USER"   # forcer /tmp même si /goinfre est dispo
+source ~/.zshrc
+
+# Ou pour pointer vers un autre emplacement entièrement
+export STUDENT_WORKSPACE_BASE="/data/$USER/workspace"
+source ~/.zshrc
+```
+
+⚠️ `STUDENT_WORKSPACE_BASE` est un **chemin complet** (le `$USER` n'est PAS ajouté automatiquement).
 
 ### Gestion des Permissions
 ```bash
@@ -97,16 +121,32 @@ fi
 ## 🚨 Considérations Importantes
 
 ### 1. Persistance des Données
-⚠️ **ATTENTION** : Les données restent dans `/tmp` et sont donc **temporaires**
-- Redémarrage système = perte de données
-- Nettoyage automatique du système possible
+
+**Mode `/goinfre` (postes 42, défaut)** :
+- ✅ Survit aux fermetures de session / login-out
+- ✅ Survit aux redémarrages du poste
+- ❌ Perdu lors d'une bascule de poste (autre machine = autre `/goinfre`)
+- ⚠️ Quota limité (~50 GB partagés avec autres outils 42)
+- **Ne jamais stocker de données critiques** — c'est un cache, pas un backup
+
+**Mode `/tmp` (fallback hors-42)** :
+- ❌ Effacé entre les sessions / au redémarrage
+- ❌ Régénération obligatoire de Homebrew, Node, Cargo à chaque login
 - **Ne jamais stocker de données critiques**
+
+Dans les deux cas, le contenu est régénérable (caches, binaires installés par scripts). Les données utilisateur (settings VS Code, extensions, sessions auth) restent dans `$HOME` (NFS).
 
 ### 2. Espace Disque
 ```bash
-# Monitoring recommandé
-df -h /tmp
-du -sh /tmp/tmp/*  # Voir l'utilisation par utilisateur
+# Vérifier le mode actif et l'espace disponible
+echo "Workspace: $STUDENT_WORKSPACE (mode: $STUDENT_WORKSPACE_KIND)"
+df -h "$STUDENT_WORKSPACE"
+
+# Voir l'utilisation détaillée du workspace utilisateur
+du -sh "$STUDENT_WORKSPACE"/*
+
+# Sur poste 42 : voir l'occupation de /goinfre par utilisateur (si lisible)
+du -sh /goinfre/* 2>/dev/null | sort -h | tail -10
 ```
 
 ### 3. Sécurité
@@ -118,17 +158,23 @@ du -sh /tmp/tmp/*  # Voir l'utilisation par utilisateur
 
 ### Commandes de Diagnostic
 ```bash
-# Voir l'espace de travail actuel
-echo $STUDENT_WORKSPACE
+# Voir l'espace de travail actuel et son type
+echo "Workspace: $STUDENT_WORKSPACE"
+echo "Type:      $STUDENT_WORKSPACE_KIND"   # goinfre | tmp | custom
 
 # Vérifier l'utilisation
-ls -la $STUDENT_WORKSPACE
+ls -la "$STUDENT_WORKSPACE"
+du -sh "$STUDENT_WORKSPACE"/*
 
-# Nettoyer son espace (attention : destructif)
-rm -rf $STUDENT_WORKSPACE/*
-
-# Réinitialiser l'environnement
+# Forcer une réévaluation du workspace après création de /goinfre/$USER
 source ~/.zshrc
+
+# Nettoyer son espace (attention : destructif, regénération nécessaire)
+rm -rf "$STUDENT_WORKSPACE"/*
+
+# Tester l'override
+STUDENT_WORKSPACE_BASE="/tmp/$USER" zsh -c 'echo $STUDENT_WORKSPACE'
+# → /tmp/$USER (force le fallback même si /goinfre est dispo)
 ```
 
 ### Fonctions Adaptées

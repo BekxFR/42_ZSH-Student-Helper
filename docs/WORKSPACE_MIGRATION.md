@@ -159,10 +159,93 @@ Cette migration résout définitivement le problème d'accessibilité multi-util
 
 ## Compatibilité OS et NFS (postes 42)
 
-La nouvelle architecture `/tmp/$USER` présente trois propriétés alignées avec l'infrastructure 42 :
+L'architecture workspace présente trois propriétés alignées avec l'infrastructure 42 :
 
 - **`$HOME` partagé NFS** entre tous les postes : le `~/.zshrc` déployé est le même partout, donc `$STUDENT_WORKSPACE` dérivé de `$USER` reste cohérent quelle que soit la machine.
-- **`/tmp` local par machine** : chaque poste repart d'un workspace vide, ce qui évite les conflits d'état entre sessions simultanées.
+- **`/tmp` et `/goinfre` locaux par machine** : chaque poste utilise son propre stockage, ce qui évite les conflits d'état entre sessions simultanées.
 - **Dual OS Ubuntu + Fedora** : la migration école est en cours, Fedora = cible finale. Aucun chemin dépendant de la distribution - le script `Deploy.sh` utilise `grep -Eq "^ID=(ubuntu|fedora)" /etc/os-release` pour valider le prérequis.
 
 Les redirections portables (Claude Code via `~/.local/share/claude`, caches VS Code via `STUDENT_USE_PORTABLE_CACHE`) s'appuient sur cette invariance de `$USER` et fonctionnent transparentement lors d'une bascule Ubuntu↔Fedora.
+
+---
+
+## Migration v2 → v3 : `/tmp/$USER` → `/goinfre/$USER` (avec fallback)
+
+### Motivation
+
+Le workspace `/tmp/$USER` était purgé entre les sessions (et parfois en cours de session sur certains postes). Conséquences observées :
+
+1. **Symlinks orphelins VS Code** : `~/.config/Code/Crashpad → /tmp/$USER/vscode-cache/Crashpad` devient un lien cassé après purge, provoquant `chrome_crashpad_handler: --database is required` au lancement de VS Code.
+2. **Réinstallations répétées** : Homebrew (~500 MB), Node.js, Cargo, container images Podman (multi-GB sur Fedora) téléchargés à chaque login.
+3. **Marketplaces Claude Code reset** : symlink `~/.claude/plugins/marketplaces` cassé entre sessions.
+
+Sur les postes 42, `/goinfre/$USER` offre une persistance entre sessions sur la même machine et un quota plus généreux. La v3 introduit une **résolution adaptative** :
+
+```
+STUDENT_WORKSPACE_BASE override → /goinfre/$USER (si dispo) → /tmp/$USER (fallback)
+```
+
+### Avant (v2.x — workspace hardcodé)
+
+```bash
+export STUDENT_WORKSPACE="/tmp/${USER:-$(whoami)}"
+```
+
+### Après (v3.x — workspace adaptatif)
+
+```bash
+_resolve_student_workspace_base() {
+    local _user="${USER:-$(whoami)}"
+    # 1. Override absolu
+    [[ -n "${STUDENT_WORKSPACE_BASE:-}" ]] && { printf '%s' "$STUDENT_WORKSPACE_BASE"; return 0; }
+    # 2. /goinfre/$USER déjà créé et accessible (cas standard 42)
+    local _goinfre_user="/goinfre/$_user"
+    if [[ -d "$_goinfre_user" && -w "$_goinfre_user" ]]; then
+        printf '%s' "$_goinfre_user"; return 0
+    fi
+    # 3. /goinfre existe + on peut créer /goinfre/$USER
+    if [[ -d "/goinfre" && -w "/goinfre" ]] \
+        && mkdir -p "$_goinfre_user" 2>/dev/null \
+        && [[ -w "$_goinfre_user" ]]; then
+        printf '%s' "$_goinfre_user"; return 0
+    fi
+    # 4. Fallback /tmp/$USER
+    printf '%s' "/tmp/$_user"
+}
+export STUDENT_WORKSPACE="$(_resolve_student_workspace_base)"
+export STUDENT_WORKSPACE_KIND=...   # goinfre | tmp | custom
+```
+
+### Bénéfices
+
+| Aspect | v2 (`/tmp`) | v3 (`/goinfre` prioritaire) |
+|---|---|---|
+| Homebrew réinstallé | À chaque purge /tmp | Une seule fois par machine |
+| Node/npm | À chaque purge /tmp | Persistant |
+| Container Podman | Re-pull multi-GB | Persistant |
+| Symlinks VS Code Crashpad | Cassés entre sessions | Stables |
+| Quota disponible | /tmp limité | ~50 GB /goinfre |
+| Compatibilité hors-42 | OK | OK (fallback /tmp) |
+
+### Auto-réparation des symlinks Claude Code
+
+La fonction `_ensure_claude_symlinks()` (et `_ensure_vscode_cache_symlinks()` pour VS Code) détecte les symlinks pointant vers un workspace obsolète (ex. ancien `/tmp/$USER` après bascule sur `/goinfre/$USER`) et les repointe automatiquement.
+
+### Override pour CI / tests / cas spécifiques
+
+```bash
+# Forcer /tmp même si /goinfre est disponible
+export STUDENT_WORKSPACE_BASE="/tmp/$USER"
+
+# Forcer un chemin entièrement différent
+export STUDENT_WORKSPACE_BASE="/data/$USER/workspace"
+
+# Puis sourcer le .zshrc
+source ~/.zshrc
+```
+
+⚠️ `STUDENT_WORKSPACE_BASE` est un **chemin complet** — le `$USER` n'est pas ajouté.
+
+### Statut migration
+
+✅ **Migration v3 complète et compatible v2** : les utilisateurs sans `/goinfre` continuent automatiquement avec `/tmp/$USER` (aucune action requise). Sur les postes 42, le bénéfice est immédiat dès le re-sourcing du `.zshrc`.

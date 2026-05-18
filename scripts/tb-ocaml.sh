@@ -28,7 +28,28 @@
 set -euo pipefail
 
 TOOLBOX_NAME="${STUDENT_TOOLBOX_NAME:-student-dev}"
-WORKSPACE="${STUDENT_WORKSPACE:-/tmp/${USER:-$(id -un)}}"
+
+# Workspace utilisateur isolé (aligne avec data/.zshrc) :
+#   1. $STUDENT_WORKSPACE (herite du shell sourcant le .zshrc)
+#   2. /goinfre/$USER si /goinfre est present et accessible (postes 42, persistant)
+#   3. /tmp/$USER en fallback (sticky bit 1777, multi-user safe)
+_resolve_workspace_dir() {
+    local _user="${USER:-$(id -un)}"
+    if [[ -n "${STUDENT_WORKSPACE:-}" ]]; then
+        printf '%s' "$STUDENT_WORKSPACE"; return 0
+    fi
+    local _goinfre_user="/goinfre/$_user"
+    if [[ -d "$_goinfre_user" && -w "$_goinfre_user" ]]; then
+        printf '%s' "$_goinfre_user"; return 0
+    fi
+    if [[ -d "/goinfre" && -w "/goinfre" ]] \
+        && mkdir -p "$_goinfre_user" 2>/dev/null \
+        && [[ -w "$_goinfre_user" ]]; then
+        printf '%s' "$_goinfre_user"; return 0
+    fi
+    printf '%s' "/tmp/$_user"
+}
+WORKSPACE="$(_resolve_workspace_dir)"
 CONTAINERS_DIR="$WORKSPACE/containers"
 STORAGE_CONF="$CONTAINERS_DIR/storage.conf"
 GRAPHROOT="$CONTAINERS_DIR/storage"

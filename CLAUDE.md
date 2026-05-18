@@ -31,14 +31,24 @@ There is no Makefile, CI/CD, linter, or build system.
 
 ### Workspace model
 
-Each user gets an isolated workspace at `/tmp/$USER` (set via `STUDENT_WORKSPACE`). All portable tools (Homebrew, Node.js, Java, Rust, Go, Cargo, Poetry, Claude Code) install there, avoiding home directory quota consumption. The `/tmp` sticky bit (1777) prevents cross-user access. Claude Code uses symlinks (`~/.local/share/claude`, `~/.cache/claude`) to redirect its data transparently. VS Code regenerable caches (`Crashpad/`, `GPUCache/`, `logs/`, `CachedProfilesData/`, `Dawn*Cache/`) can be symlinked to `$STUDENT_WORKSPACE/vscode-cache/` via the `STUDENT_USE_PORTABLE_CACHE` flag - deliberately excludes `User/`, `WebStorage/`, `globalStorage/` to preserve settings and extension auth.
+Each user gets an isolated workspace resolved at shell startup via `_resolve_student_workspace_base()` (set into `STUDENT_WORKSPACE`). Resolution order:
+
+1. **`$STUDENT_WORKSPACE_BASE` override** (full path, no `$USER` appended) — power-user escape hatch.
+2. **`/goinfre/$USER`** if `/goinfre` is present and writable (standard on 42 workstations Ubuntu+Fedora — sticky 1777, ~50 GB quota, **persistent across sessions on the same machine**).
+3. **`/tmp/$USER`** fallback (sticky 1777) for personal laptops, Docker, CI, or machines without `/goinfre`.
+
+A companion variable `STUDENT_WORKSPACE_KIND` exposes the resolution result (`goinfre` / `tmp` / `custom`) for diagnostics and aliases.
+
+All portable tools (Homebrew, Node.js, Java, Rust, Go, Cargo, Poetry, Claude Code) install under `$STUDENT_WORKSPACE`, avoiding home directory quota consumption. The `/goinfre` model adds **persistence between sessions**: Homebrew, Node, Cargo, container images, and VS Code caches no longer need re-downloading on every login on the same workstation.
+
+Multi-user safety is preserved through both bases (sticky bit on `/tmp`, per-user ownership 700 on `/goinfre/$USER`). Claude Code uses symlinks (`~/.local/share/claude`, `~/.cache/claude`, `~/.claude/plugins/marketplaces`) auto-healed by `_ensure_claude_symlinks()` — if a symlink points to a stale workspace (e.g. legacy `/tmp/$USER` after upgrading to `/goinfre`), it is silently repointed. VS Code regenerable caches (`Crashpad/`, `GPUCache/`, `logs/`, `CachedProfilesData/`, `Dawn*Cache/`) can be symlinked to `$STUDENT_WORKSPACE/vscode-cache/` via the `STUDENT_USE_PORTABLE_CACHE` flag — deliberately excludes `User/`, `WebStorage/`, `globalStorage/` to preserve settings and extension auth.
 
 ### OS detection & Fedora/Toolbox integration
 
 The config detects the running distro via `/etc/os-release` and exports `STUDENT_OS_ID` (values: `ubuntu`, `fedora`, `unknown`). Fedora-specific behaviour:
 
 - **VS Code auto-mkdir**: each shell source creates `/goinfre/$USER/.config/Code/{Cache,CachedExtensionVSIXs,Service Worker,CachedData}` if missing — without these subfolders VS Code refuses to launch on 42 Fedora workstations. Not a flag, it's a hard system prerequisite.
-- **Podman/Toolbox storage redirection**: on Fedora, `CONTAINERS_STORAGE_CONF` points at `$STUDENT_WORKSPACE/containers/storage.conf`, generated on-demand by `_ensure_toolbox_storage()`. All Podman/Toolbox data (images, layers, container rootfs) lives under `/tmp/$USER/containers/` — preserves the NFS quota.
+- **Podman/Toolbox storage redirection**: on Fedora, `CONTAINERS_STORAGE_CONF` points at `$STUDENT_WORKSPACE/containers/storage.conf`, generated on-demand by `_ensure_toolbox_storage()`. All Podman/Toolbox data (images, layers, container rootfs) lives under `$STUDENT_WORKSPACE/containers/` — preserves the NFS quota. With the `/goinfre` base (default on 42), image layers also persist across sessions, eliminating multi-GB re-pulls.
 - **Toolbox-backed tool provisioning**: the container name is `STUDENT_TOOLBOX_NAME` (default `student-dev`). `OCamlInstall()` provisions OCaml + `rlwrap` inside this container on Fedora (`toolbox create -y -c ... && toolbox run -c ... sudo dnf install -y ocaml ocaml-compiler-libs ocaml-findlib rlwrap`). On Ubuntu the same function uses `brew install ocaml rlwrap`.
 - **Transparent wrappers**: `ocaml`, `ocamlopt`, `ocamlc`, `ocamlfind`, `rlwrap` are shell functions that call the native binary if available (Ubuntu brew path) and otherwise route via `toolbox run -c "$STUDENT_TOOLBOX_NAME"` on Fedora. Usage (`ocamlopt -c atom.ml`, `rlwrap ocaml`) is identical on both OSes.
 - **Portable script `scripts/tb-ocaml.sh`**: standalone wrapper (no `.zshrc` dependency) that compiles OCaml via Toolbox on any Fedora workstation. Subcommands: `setup`, `clean`, `status`, `help`; any other argument is forwarded to `toolbox run -c "$STUDENT_TOOLBOX_NAME"` (e.g. `tb-ocaml.sh make`, `tb-ocaml.sh ocamlopt -c atom.ml`, `tb-ocaml.sh rlwrap ocaml`). Re-implements the storage-redirection logic internally so the NFS quota stays preserved even on machines where the project isn't deployed. Copy-and-run workflow: `scp tb-ocaml.sh` to the target machine, `./tb-ocaml.sh setup`, then `./tb-ocaml.sh make` in the project directory, `./tb-ocaml.sh clean` at the end to free disk.

@@ -134,11 +134,56 @@ fi
 # Nom du conteneur Toolbox utilisé sur Fedora pour fournir les outils manquants (ocaml, rlwrap, etc.)
 export STUDENT_TOOLBOX_NAME="${STUDENT_TOOLBOX_NAME:-student-dev}"
 
-# Configuration Node.js et npm dans /tmp/USERNAME (sans sudo)
-# Dynamic user workspace - accessible to all users
-export STUDENT_WORKSPACE="/tmp/${USER:-$(whoami)}"
+# Workspace utilisateur isolé (accessible à tous les utilisateurs)
+#
+# Sélection automatique de la base :
+#   1. Override explicite via $STUDENT_WORKSPACE_BASE (chemin complet, $USER non ajouté)
+#   2. /goinfre/$USER si /goinfre est présent et accessible en écriture (postes 42 : ~50 Go,
+#      persistant entre sessions sur la même machine, quota NFS non impacté)
+#   3. /tmp/$USER en fallback (laptop perso, Docker, CI, ou machine sans /goinfre)
+#
+# /goinfre est privilégié car :
+#   - Persistance entre sessions → plus de réinstallations de Homebrew/Node/Cargo à chaque login
+#   - Quota plus généreux que /tmp → moins de saturation pour conteneurs Podman, SDK Android
+#   - Caches VS Code Crashpad non orphelins (cause d'erreur `--database is required`)
+# /tmp reste utilisé hors-42 ou si /goinfre est inaccessible (multi-user safety préservée).
+_resolve_student_workspace_base() {
+    local _user="${USER:-$(whoami)}"
 
-# Fedora: rediriger le stockage Podman/Toolbox vers /tmp/$USER pour respecter la contrainte NFS.
+    # 1. Override explicite — priorité absolue, aucune vérification
+    if [[ -n "${STUDENT_WORKSPACE_BASE:-}" ]]; then
+        printf '%s' "$STUDENT_WORKSPACE_BASE"
+        return 0
+    fi
+
+    # 2. /goinfre/$USER déjà créé et accessible en écriture (cas standard 42)
+    local _goinfre_user="/goinfre/$_user"
+    if [[ -d "$_goinfre_user" && -w "$_goinfre_user" ]]; then
+        printf '%s' "$_goinfre_user"
+        return 0
+    fi
+
+    # 3. /goinfre existe et création de /goinfre/$USER possible
+    if [[ -d "/goinfre" && -w "/goinfre" ]] \
+        && mkdir -p "$_goinfre_user" 2>/dev/null \
+        && [[ -w "$_goinfre_user" ]]; then
+        printf '%s' "$_goinfre_user"
+        return 0
+    fi
+
+    # 4. Fallback /tmp/$USER (comportement historique, hors-42 ou /goinfre absent)
+    printf '%s' "/tmp/$_user"
+}
+export STUDENT_WORKSPACE="$(_resolve_student_workspace_base)"
+
+# Indicateur lisible (utilisé par les diagnostics et la doc d'aide)
+case "$STUDENT_WORKSPACE" in
+    /goinfre/*) export STUDENT_WORKSPACE_KIND="goinfre" ;;
+    /tmp/*)     export STUDENT_WORKSPACE_KIND="tmp" ;;
+    *)          export STUDENT_WORKSPACE_KIND="custom" ;;
+esac
+
+# Fedora: rediriger le stockage Podman/Toolbox vers $STUDENT_WORKSPACE pour respecter la contrainte NFS.
 # Évite que les images de base et le conteneur Toolbox (plusieurs centaines de Mo) saturent le quota.
 if [[ "$STUDENT_OS_ID" == "fedora" ]]; then
     export CONTAINERS_STORAGE_CONF="$STUDENT_WORKSPACE/containers/storage.conf"
@@ -247,31 +292,39 @@ export POETRY_HOME="$STUDENT_WORKSPACE/.poetry"
 export CONDA_PKGS_DIRS="$STUDENT_WORKSPACE/.conda/pkgs"
 export CONDA_ENVS_PATH="$STUDENT_WORKSPACE/.conda/envs"
 
-# Claude Code (binaires, cache et marketplaces de plugins redirigés via symlinks vers /tmp)
-[[ "$STUDENT_USE_PORTABLE_CLAUDE" == "1" ]] && {
+# Claude Code (binaires, cache et marketplaces de plugins redirigés via symlinks vers $STUDENT_WORKSPACE).
+# La fonction _ensure_claude_symlinks répare aussi les symlinks pointant vers un ancien workspace
+# (cas typique : utilisateur ayant initialement utilisé /tmp puis basculé sur /goinfre via détection).
+_ensure_claude_symlinks() {
+    [[ "$STUDENT_USE_PORTABLE_CLAUDE" == "1" ]] || return 0
     local _claude_data="$STUDENT_WORKSPACE/.local/share/claude"
     local _claude_cache="$STUDENT_WORKSPACE/.cache/claude"
     local _claude_marketplaces="$STUDENT_WORKSPACE/claude-marketplaces"
     mkdir -p "$_claude_data" "$_claude_cache" "$_claude_marketplaces" 2>/dev/null
-    # Créer les symlinks si nécessaire (redirection transparente)
-    [[ ! -L "$HOME/.local/share/claude" ]] && {
-        rm -rf "$HOME/.local/share/claude" 2>/dev/null
-        mkdir -p "$HOME/.local/share" 2>/dev/null
-        ln -sf "$_claude_data" "$HOME/.local/share/claude"
-    }
-    [[ ! -L "$HOME/.cache/claude" ]] && {
-        rm -rf "$HOME/.cache/claude" 2>/dev/null
-        mkdir -p "$HOME/.cache" 2>/dev/null
-        ln -sf "$_claude_cache" "$HOME/.cache/claude"
-    }
-    # Marketplaces de plugins : évite l'échec "could not create leading directories"
-    # quand /tmp est vidé entre les sessions (nécessaire pour /plugin install)
-    [[ ! -L "$HOME/.claude/plugins/marketplaces" ]] && {
-        rm -rf "$HOME/.claude/plugins/marketplaces" 2>/dev/null
-        mkdir -p "$HOME/.claude/plugins" 2>/dev/null
-        ln -sf "$_claude_marketplaces" "$HOME/.claude/plugins/marketplaces"
-    }
+
+    local _link _target _current _parent
+    # Triplets (cible attendue, chemin du symlink, parent à créer)
+    local _pairs=(
+        "$_claude_data|$HOME/.local/share/claude|$HOME/.local/share"
+        "$_claude_cache|$HOME/.cache/claude|$HOME/.cache"
+        "$_claude_marketplaces|$HOME/.claude/plugins/marketplaces|$HOME/.claude/plugins"
+    )
+    local _entry
+    for _entry in "${_pairs[@]}"; do
+        _target="${_entry%%|*}"
+        _link="${_entry#*|}"; _link="${_link%%|*}"
+        _parent="${_entry##*|}"
+        _current=""
+        [[ -L "$_link" ]] && _current="$(readlink "$_link" 2>/dev/null)"
+        # Réparer si : lien absent, cassé, ou pointant vers une cible obsolète (ancien workspace).
+        if [[ "$_current" != "$_target" ]] || [[ ! -d "$_link/" ]]; then
+            rm -rf "$_link" 2>/dev/null
+            mkdir -p "$_parent" 2>/dev/null
+            ln -sfn "$_target" "$_link"
+        fi
+    done
 }
+_ensure_claude_symlinks
 
 # Fedora : créer les dossiers attendus par VS Code sous /goinfre/$USER/.config/Code
 # VS Code refuse de démarrer sur Fedora si ces sous-dossiers n'existent pas.
@@ -485,27 +538,44 @@ build_prompt() {
 
 # setup environnement functions
 setup_temp_directories() {
-    # Dynamic user-specific workspace with robust permission handling
+    # Workspace dynamique (résolu via _resolve_student_workspace_base : /goinfre/$USER prioritaire, /tmp/$USER en fallback).
+    # Cette fonction réutilise la résolution déjà faite au sourcing initial pour rester cohérente
+    # entre les exécutions sync/async et après une éventuelle modification de STUDENT_WORKSPACE_BASE.
     local username="${USER:-$(whoami)}"
-    local user_workspace="/tmp/${username}"
+    local user_workspace
+    user_workspace="$(_resolve_student_workspace_base)"
     local selected_dir=""
-    
-    logs_debug "Configuration de l'espace de travail pour l'utilisateur: $username"
-    
+
+    logs_debug "Configuration de l'espace de travail pour l'utilisateur: $username (base: $user_workspace)"
+
     # Tentative de création avec gestion des permissions
     if mkdir -p "$user_workspace" 2>/dev/null && [[ -w "$user_workspace" ]]; then
         selected_dir="$user_workspace"
-        logs_debug "Répertoire utilisateur créé: $selected_dir"
-        
+        logs_debug "Répertoire utilisateur prêt: $selected_dir"
+
         # Nettoyage des processus orphelins si nécessaire
         cleanup_stale_processes "$selected_dir"
     else
-        logs_error "Impossible de créer ou d'accéder au répertoire utilisateur: $user_workspace"
-        logs_error "Vérifiez les permissions sur /tmp"
-        return 1
+        # Si /goinfre/$USER échoue après la résolution initiale (montage instable, perms changées),
+        # bascule en dur sur /tmp/$USER pour garantir la disponibilité du workspace.
+        local fallback_workspace="/tmp/${username}"
+        logs_warning "Workspace $user_workspace indisponible, bascule sur $fallback_workspace"
+        if mkdir -p "$fallback_workspace" 2>/dev/null && [[ -w "$fallback_workspace" ]]; then
+            selected_dir="$fallback_workspace"
+            cleanup_stale_processes "$selected_dir"
+        else
+            logs_error "Impossible de créer ou d'accéder au répertoire utilisateur: $fallback_workspace"
+            logs_error "Vérifiez les permissions sur /tmp"
+            return 1
+        fi
     fi
-    
+
     export STUDENT_WORKSPACE="$selected_dir"
+    case "$STUDENT_WORKSPACE" in
+        /goinfre/*) export STUDENT_WORKSPACE_KIND="goinfre" ;;
+        /tmp/*)     export STUDENT_WORKSPACE_KIND="tmp" ;;
+        *)          export STUDENT_WORKSPACE_KIND="custom" ;;
+    esac
     
     local dirs=("$selected_dir" "$selected_dir/.cache" "$selected_dir/homebrew" "$selected_dir/homebrew/bin")
     

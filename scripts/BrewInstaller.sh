@@ -1,7 +1,28 @@
 #!/bin/bash
 
-# Workspace utilisateur isolé (aligné avec data/.zshrc : /tmp/$USER, sticky bit 1777)
-WORKSPACE_DIR="${STUDENT_WORKSPACE:-/tmp/$(id -un)}"
+# Workspace utilisateur isolé. Aligné sur data/.zshrc :
+#   1. $STUDENT_WORKSPACE (hérité du shell sourcé)
+#   2. /goinfre/$USER si /goinfre est présent et accessible en écriture (postes 42)
+#   3. /tmp/$USER en fallback (sticky bit 1777 — multi-user safe)
+_resolve_workspace_dir() {
+    local _user
+    _user="$(id -un)"
+    if [[ -n "${STUDENT_WORKSPACE:-}" ]]; then
+        printf '%s' "$STUDENT_WORKSPACE"
+        return 0
+    fi
+    local _goinfre_user="/goinfre/$_user"
+    if [[ -d "$_goinfre_user" && -w "$_goinfre_user" ]]; then
+        printf '%s' "$_goinfre_user"; return 0
+    fi
+    if [[ -d "/goinfre" && -w "/goinfre" ]] \
+        && mkdir -p "$_goinfre_user" 2>/dev/null \
+        && [[ -w "$_goinfre_user" ]]; then
+        printf '%s' "$_goinfre_user"; return 0
+    fi
+    printf '%s' "/tmp/$_user"
+}
+WORKSPACE_DIR="$(_resolve_workspace_dir)"
 
 # Echec explicite si le workspace n'est pas accessible (plus de fallback multi-user-unsafe)
 if ! mkdir -p "$WORKSPACE_DIR" 2>/dev/null || [[ ! -w "$WORKSPACE_DIR" ]]; then

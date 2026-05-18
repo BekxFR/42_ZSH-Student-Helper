@@ -37,7 +37,15 @@ echo "   STUDENT_USE_PORTABLE_XDG: ${STUDENT_USE_PORTABLE_XDG:-0}"
 # Vérifications de sécurité
 SAFE_CONFIG=true
 
-if [[ -n "$JAVA_HOME" && "$JAVA_HOME" == *"/tmp/"* && "${STUDENT_USE_PORTABLE_JAVA:-0}" != "1" ]]; then
+# Détection workspace : accepte /tmp/$USER ou /goinfre/$USER (depuis la migration multi-base)
+_is_in_workspace() {
+    case "$1" in
+        /tmp/*|/goinfre/*) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
+if [[ -n "$JAVA_HOME" ]] && _is_in_workspace "$JAVA_HOME" && [[ "${STUDENT_USE_PORTABLE_JAVA:-0}" != "1" ]]; then
     echo "❌ ERREUR: JAVA_HOME modifié sans activation explicite!"
     SAFE_CONFIG=false
 fi
@@ -76,8 +84,8 @@ source "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/data/.zshrc"
 echo "Variables après activation Java portable:"
 echo "   JAVA_HOME: ${JAVA_HOME:-NON DÉFINI}"
 
-if [[ "$JAVA_HOME" == *"/tmp/"* ]]; then
-    echo "✅ Java portable activé correctement"
+if _is_in_workspace "$JAVA_HOME"; then
+    echo "✅ Java portable activé correctement (workspace: $JAVA_HOME)"
 else
     echo "❌ Java portable non activé"
 fi
@@ -136,7 +144,7 @@ ALL_SAFE=true
 
 for var in "${SAFE_VARS[@]}"; do
     value="${!var}"
-    if [[ -n "$value" && "$value" == *"/tmp/"* ]]; then
+    if [[ -n "$value" ]] && _is_in_workspace "$value"; then
         echo "✅ $var: $value (sûr)"
     else
         echo "❌ $var: ${value:-NON DÉFINI} (problème)"
