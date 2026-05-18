@@ -1009,245 +1009,162 @@ GF() {
 	fi
 }
 
+# --- Discord (packaging upstream 2024+ : tarball = updater_bootstrap, pas le client) ---
+#
+# Stratégie de stockage : séparation lourd/léger.
+#   - Binaire Discord (~250 MB, régénérable via bootstrap) → $STUDENT_WORKSPACE (workspace)
+#   - Cookies + sessions auth (~50 KB, non régénérables) → ~/.config/discord/ (NFS, défaut XDG)
+#     → l'utilisateur ne perd pas son login en changeant de poste.
+#   - Caches lourds (~/.config/discord/Cache, Code Cache) → libre à l'utilisateur de les
+#     symliquer vers $STUDENT_WORKSPACE/.config/discord/{Cache,Code Cache} pour épargner le quota NFS
+#     (symlinks à créer manuellement, non touchés par ce script).
+#
+# Layout sur le workspace :
+#   $STUDENT_WORKSPACE/
+#   ├── discord-tarball/          # download du tar.gz + extraction (wrapper, updater_bootstrap)
+#   │   └── Discord/{discord, updater_bootstrap, discord.desktop, ...}
+#   └── discord-app/              # zone d'installation du bootstrap (--root-path)
+#       └── <version>/Discord     # binaire applicatif (exécuté directement, sans wrapper)
+#
+# Runtime config (inchangé, défaut XDG) :
+#   ~/.config/discord/            # Cookies, blob_storage, IndexedDB, sessions, etc.
+
+_discord_detect_vscode_or_abort() {
+    # Détecte un terminal VS Code et ajoute les flags de compatibilité (et confirme avec l'utilisateur).
+    # Stdin : aucun. Stdout : aucun. Stderr : logs/prompt.
+    # Sortie : 0 = continuer, 1 = utilisateur a annulé.
+    if [[ -n "${VSCODE_INJECTION:-}" || "${TERM_PROGRAM:-}" == "vscode" || -n "${VSCODE_PID:-}" || \
+          "${TERMINAL_EMULATOR:-}" == "vscode" || -n "${VSCODE_IPC_HOOK:-}" ]]; then
+        _DISCORD_VSCODE_FLAGS=("--disable-gpu-sandbox" "--disable-features=VizDisplayCompositor")
+        logs_warning "⚠️  VS Code détecté - flags de compatibilité ajoutés"
+        echo -n "🤔 Continuer le lancement de Discord dans VS Code ? [y/N]: "
+        local response
+        read -r response
+        case "$response" in
+            [yY]*) logs_info "🔧 Flags de compatibilité VS Code appliqués"; return 0 ;;
+            *)     logs_info "⏸️  Lancement annulé"; return 1 ;;
+        esac
+    fi
+    _DISCORD_VSCODE_FLAGS=()
+    return 0
+}
+
+_discord_ensure_tarball() {
+    # S'assure que updater_bootstrap est extrait dans $STUDENT_WORKSPACE/discord-tarball/Discord/.
+    # Sortie : 0 = OK, 1 = échec (téléchargement / extraction).
+    local _tarball_dir="$1"
+    local _bootstrap="$_tarball_dir/Discord/updater_bootstrap"
+    local _download_url="https://discord.com/api/download?platform=linux&format=tar.gz"
+    [[ -x "$_bootstrap" ]] && return 0
+
+    logs_info "📥 Téléchargement du tarball Discord..."
+    mkdir -p "$_tarball_dir" || { logs_error "❌ mkdir $_tarball_dir"; return 1; }
+    local _tar="$_tarball_dir/discord.tar.gz"
+    if ! curl -fL --connect-timeout 15 -o "$_tar" "$_download_url" 2>/dev/null; then
+        logs_error "❌ Échec téléchargement Discord"; return 1
+    fi
+    logs_info "📦 Extraction du tarball..."
+    if ! tar -xzf "$_tar" -C "$_tarball_dir" 2>/dev/null; then
+        logs_error "❌ Échec extraction du tarball"; return 1
+    fi
+    rm -f "$_tar"
+    if [[ ! -x "$_bootstrap" ]]; then
+        logs_error "❌ updater_bootstrap absent après extraction (format upstream changé ?)"
+        return 1
+    fi
+    return 0
+}
+
+_discord_find_installed_binary() {
+    # Cherche un binaire Discord installé sous $1 (zone d'install du bootstrap).
+    # Renvoie le chemin sur stdout si trouvé, vide sinon. Toujours retour 0.
+    local _app_dir="$1"
+    [[ -d "$_app_dir" ]] || { printf ''; return 0; }
+    # Le bootstrap installe sous $_app_dir/<version>/Discord ; on prend la version la plus récente.
+    find "$_app_dir" -maxdepth 2 -name Discord -type f -executable 2>/dev/null | sort -V | tail -1
+}
+
 discord() {
-    local DISCORD_DIR="${STUDENT_WORKSPACE}/discord"
-    local DOWNLOAD_URL="https://discord.com/api/download?platform=linux&format=tar.gz"
-    local VS_CODE_DETECTED=false
+    local _ws="${STUDENT_WORKSPACE:?STUDENT_WORKSPACE non défini}"
+    local _tarball_dir="$_ws/discord-tarball"
+    local _app_dir="$_ws/discord-app"
+    local _channel="stable"
+    local _repo_url="https://updates.discord.com/"
     local BASE_FLAGS=("--no-sandbox" "--disable-dev-shm-usage")
-    local VSCODE_FLAGS=("--disable-gpu-sandbox" "--disable-features=VizDisplayCompositor")
-    local ALL_FLAGS=()
-    local ORIGINAL_DIR="$(pwd)"
-    
-    ALL_FLAGS+=("${BASE_FLAGS[@]}")
+    local _DISCORD_VSCODE_FLAGS=()
 
-    if [[ -n "$VSCODE_INJECTION" || "$TERM_PROGRAM" == "vscode" || -n "$VSCODE_PID" || 
-          "$TERMINAL_EMULATOR" == "vscode" || -n "$VSCODE_IPC_HOOK" ]]; then
-        VS_CODE_DETECTED=true
-        ALL_FLAGS+=("${VSCODE_FLAGS[@]}")
-        logs_warning "⚠️  VS Code détecté - Application de flags de compatibilité"
-        logs_info "💡 Des flags spéciaux seront utilisés pour éviter les conflits"
-        
+    _discord_detect_vscode_or_abort || return 0
+    local ALL_FLAGS=("${BASE_FLAGS[@]}" "${_DISCORD_VSCODE_FLAGS[@]}")
 
-        echo -n "🤔 Continuer le lancement de Discord dans VS Code ? [y/N]: "
-        read -r response
-        case "$response" in
-            [yY][eE][sS]|[yY])
-                logs_info "🔧 Utilisation des flags de compatibilité VS Code"
-                ;;
-            *)
-                logs_info "⏸️  Lancement annulé. Conseil: utilisez un terminal externe pour Discord"
-                return 0
-                ;;
-        esac
-    fi
-
-    if [[ -x "$DISCORD_DIR/Discord/Discord" ]]; then
-        logs_info "🚀 Lancement de Discord..."
-        cd "$DISCORD_DIR"
-        nohup ./Discord/Discord "${ALL_FLAGS[@]}" >/dev/null 2>&1 &
+    # 1. Lancement rapide si binaire déjà installé (XDG_CONFIG_HOME par défaut → cookies dans ~/.config/discord/)
+    local _bin
+    _bin="$(_discord_find_installed_binary "$_app_dir")"
+    if [[ -n "$_bin" && -x "$_bin" ]]; then
+        logs_info "🚀 Lancement de Discord (binaire : $_bin)..."
+        nohup "$_bin" "${ALL_FLAGS[@]}" >/dev/null 2>&1 &
         logs_success "✅ Discord lancé en arrière-plan"
-        cd "$ORIGINAL_DIR"
         return 0
     fi
 
-    logs_info "📥 Téléchargement de Discord..."
-    mkdir -p "$DISCORD_DIR"
-    cd "$DISCORD_DIR"
+    # 2. S'assurer que updater_bootstrap est disponible
+    _discord_ensure_tarball "$_tarball_dir" || return 1
+    local _bootstrap="$_tarball_dir/Discord/updater_bootstrap"
 
-    if curl -L -o discord.tar.gz "$DOWNLOAD_URL" 2>/dev/null; then
-        logs_success "✅ Téléchargement réussi"
-        
-        logs_info "📦 Extraction..."
-        if tar -xzf discord.tar.gz 2>/dev/null; then
-            logs_success "✅ Extraction réussie"
-            
-            if [[ -d "Discord" && -x "Discord/Discord" ]]; then
-                logs_info "🚀 Lancement de Discord..."
-                nohup ./Discord/Discord "${ALL_FLAGS[@]}" >/dev/null 2>&1 &
-                logs_success "✅ Discord installé et lancé en arrière-plan"
-                cd "$ORIGINAL_DIR"
-                return 0
-            else
-                logs_error "❌ Erreur: L'exécutable Discord n'a pas été trouvé"
-                cd "$ORIGINAL_DIR"
-                return 1
-            fi
-        else
-            logs_error "❌ Échec de l'extraction"
-            cd "$ORIGINAL_DIR"
-            return 1
-        fi
-    else
-        logs_error "❌ Échec du téléchargement"
-        cd "$ORIGINAL_DIR"
+    # 3. Bootstrap : télécharge et installe le vrai client dans $_app_dir/<version>/Discord
+    logs_info "📦 Installation du client Discord via updater_bootstrap..."
+    mkdir -p "$_app_dir" || { logs_error "❌ mkdir $_app_dir"; return 1; }
+    local _version _rc
+    _version=$("$_bootstrap" --no-zenity "$_app_dir" "$_channel" "$_repo_url" 2>&1)
+    _rc=$?
+    if [[ $_rc -ne 0 ]]; then
+        logs_error "❌ Bootstrap a échoué (code $_rc) : $_version"
         return 1
     fi
-}
-
-# Version avec eval pour Discord
-discord_eval() {
-    local DISCORD_DIR="$STUDENT_WORKSPACE/discord"
-    local DOWNLOAD_URL="https://discord.com/api/download?platform=linux&format=tar.gz"
-    local VS_CODE_DETECTED=false
-    local BASE_FLAGS=("--no-sandbox" "--disable-dev-shm-usage")
-    local VSCODE_FLAGS=("--disable-gpu-sandbox" "--disable-features=VizDisplayCompositor")
-    local ALL_FLAGS=()
-    local ORIGINAL_DIR="$(pwd)"
-    
-    ALL_FLAGS+=("${BASE_FLAGS[@]}")
-
-    if [[ -n "$VSCODE_INJECTION" || "$TERM_PROGRAM" == "vscode" || -n "$VSCODE_PID" || 
-          "$TERMINAL_EMULATOR" == "vscode" || -n "$VSCODE_IPC_HOOK" ]]; then
-        VS_CODE_DETECTED=true
-        ALL_FLAGS+=("${VSCODE_FLAGS[@]}")
-        logs_warning "⚠️  VS Code détecté - Application de flags de compatibilité"
-        logs_info "💡 Des flags spéciaux seront utilisés pour éviter les conflits"
-        
-
-        echo -n "🤔 Continuer le lancement de Discord dans VS Code ? [y/N]: "
-        read -r response
-        case "$response" in
-            [yY][eE][sS]|[yY])
-                logs_info "🔧 Utilisation des flags de compatibilité VS Code (version eval)"
-                ;;
-            *)
-                logs_info "⏸️  Lancement annulé. Conseil: utilisez un terminal externe pour Discord"
-                return 0
-                ;;
-        esac
-    fi
-
-    if [[ -x "$DISCORD_DIR/Discord/Discord" ]]; then
-        logs_info "🚀 Lancement de Discord (version eval)..."
-        cd "$DISCORD_DIR"
-        eval "nohup ./Discord/Discord "${ALL_FLAGS[@]}" >/dev/null 2>&1 &"
-        logs_success "✅ Discord lancé en arrière-plan"
-        cd "$ORIGINAL_DIR"
-        return 0
-    fi
-
-    logs_info "📥 Téléchargement de Discord..."
-    mkdir -p "$DISCORD_DIR"
-    cd "$DISCORD_DIR"
-
-    if curl -L -o discord.tar.gz "$DOWNLOAD_URL" 2>/dev/null; then
-        logs_success "✅ Téléchargement réussi"
-        
-        logs_info "📦 Extraction..."
-        if tar -xzf discord.tar.gz 2>/dev/null; then
-            logs_success "✅ Extraction réussie"
-            
-            if [[ -d "Discord" && -x "Discord/Discord" ]]; then
-                logs_info "🚀 Lancement de Discord (version eval)..."
-                eval "nohup ./Discord/Discord "${ALL_FLAGS[@]}" >/dev/null 2>&1 &"
-                logs_success "✅ Discord installé et lancé en arrière-plan"
-                cd "$ORIGINAL_DIR"
-                return 0
-            else
-                logs_error "❌ Erreur: L'exécutable Discord n'a pas été trouvé"
-                cd "$ORIGINAL_DIR"
-                return 1
-            fi
-        else
-            logs_error "❌ Échec de l'extraction"
-            cd "$ORIGINAL_DIR"
-            return 1
-        fi
-    else
-        logs_error "❌ Échec du téléchargement"
-        cd "$ORIGINAL_DIR"
+    _bin="$_app_dir/$_version/Discord"
+    if [[ ! -x "$_bin" ]]; then
+        logs_error "❌ Binaire absent après bootstrap : $_bin"
         return 1
     fi
+
+    # 4. Lancement (XDG_CONFIG_HOME par défaut → cookies/sessions persistent dans ~/.config/discord/)
+    logs_info "🚀 Lancement de Discord..."
+    nohup "$_bin" "${ALL_FLAGS[@]}" >/dev/null 2>&1 &
+    logs_success "✅ Discord installé et lancé en arrière-plan"
+    return 0
 }
 
-# Version avec pushd/popd pour une gestion plus robuste des répertoires
-discord_pushd() {
-    local DISCORD_DIR="$STUDENT_WORKSPACE/discord"
-    local DOWNLOAD_URL="https://discord.com/api/download?platform=linux&format=tar.gz"
-    local VS_CODE_DETECTED=false
-    local BASE_FLAGS=("--no-sandbox" "--disable-dev-shm-usage")
-    local VSCODE_FLAGS=("--disable-gpu-sandbox" "--disable-features=VizDisplayCompositor")
-    local ALL_FLAGS=()
-    
-    ALL_FLAGS+=("${BASE_FLAGS[@]}")
+# Variantes legacy : redirigent toutes vers discord() (les anciennes implémentations divergentes
+# faisaient le même travail avec des mécanismes shell différents, toutes cassées par le nouveau
+# packaging upstream). Conservées pour compatibilité d'API.
+discord_eval()  { discord "$@"; }
+discord_pushd() { discord "$@"; }
 
-    if [[ -n "$VSCODE_INJECTION" || "$TERM_PROGRAM" == "vscode" || -n "$VSCODE_PID" || 
-          "$TERMINAL_EMULATOR" == "vscode" || -n "$VSCODE_IPC_HOOK" ]]; then
-        VS_CODE_DETECTED=true
-        ALL_FLAGS+=("${VSCODE_FLAGS[@]}")
-        logs_warning "⚠️  VS Code détecté - Application de flags de compatibilité"
-        logs_info "💡 Version pushd/popd utilisée pour la gestion des répertoires"
-        
-        echo -n "🤔 Continuer le lancement de Discord dans VS Code ? [y/N]: "
-        read -r response
-        case "$response" in
-            [yY][eE][sS]|[yY])
-                logs_info "🔧 Utilisation des flags de compatibilité VS Code (version pushd)"
-                ;;
-            *)
-                logs_info "⏸️  Lancement annulé"
-                return 0
-                ;;
-        esac
-    fi
-
-    # Sauvegarder le répertoire avec pushd
-    pushd "$DISCORD_DIR" >/dev/null 2>&1 || {
-        mkdir -p "$DISCORD_DIR"
-        pushd "$DISCORD_DIR" >/dev/null 2>&1
-    }
-
-    if [[ -x "Discord/Discord" ]]; then
-        logs_info "🚀 Lancement de Discord (version pushd)..."
-        nohup ./Discord/Discord "${ALL_FLAGS[@]}" >/dev/null 2>&1 &
-        logs_success "✅ Discord lancé en arrière-plan"
-        popd >/dev/null 2>&1
-        return 0
-    fi
-
-    logs_info "📥 Téléchargement de Discord..."
-    
-    if curl -L -o discord.tar.gz "$DOWNLOAD_URL" 2>/dev/null; then
-        logs_success "✅ Téléchargement réussi"
-        
-        logs_info "📦 Extraction..."
-        if tar -xzf discord.tar.gz 2>/dev/null; then
-            logs_success "✅ Extraction réussie"
-            
-            if [[ -d "Discord" && -x "Discord/Discord" ]]; then
-                logs_info "🚀 Lancement de Discord..."
-                nohup ./Discord/Discord "${ALL_FLAGS[@]}" >/dev/null 2>&1 &
-                logs_success "✅ Discord installé et lancé en arrière-plan"
-                popd >/dev/null 2>&1
-                return 0
-            else
-                logs_error "❌ Erreur: L'exécutable Discord n'a pas été trouvé"
-                popd >/dev/null 2>&1
-                return 1
-            fi
-        else
-            logs_error "❌ Échec de l'extraction"
-            popd >/dev/null 2>&1
-            return 1
-        fi
-    else
-        logs_error "❌ Échec du téléchargement"
-        popd >/dev/null 2>&1
-        return 1
-    fi
-}
-
-# Alias de debug pour Discord avec retour au répertoire d'origine
-alias discord_debug='VSCODE_PID="" discord'
-alias discord_force='ORIGINAL_PWD="$(pwd)" && cd "$STUDENT_WORKSPACE/discord" && ./Discord/Discord --no-sandbox --disable-dev-shm-usage 2>&1; cd "$ORIGINAL_PWD"'
-alias discord_minimal='ORIGINAL_PWD="$(pwd)" && cd "$STUDENT_WORKSPACE/discord" && ./Discord/Discord 2>&1; cd "$ORIGINAL_PWD"'
-
-# Fonction utilitaire pour tester Discord depuis n'importe quel répertoire
 discord_test() {
     echo "🧪 Test de lancement Discord depuis: $(pwd)"
-    echo "📂 Installation/lancement dans: $STUDENT_WORKSPACE/discord"
+    echo "📂 Tarball  : $STUDENT_WORKSPACE/discord-tarball"
+    echo "📂 Binaire  : $STUDENT_WORKSPACE/discord-app/<version>/Discord"
+    echo "📂 Cookies  : ~/.config/discord/ (NFS, persiste entre postes)"
     discord
-    echo "📁 Vous êtes maintenant dans: $(pwd)"
+    echo "📁 Répertoire courant inchangé : $(pwd)"
+}
+
+# Alias de debug : force la non-détection VS Code (utile en terminal externe lancé depuis VS Code)
+alias discord_debug='VSCODE_PID="" VSCODE_INJECTION="" VSCODE_IPC_HOOK="" TERM_PROGRAM="" discord'
+# Aliases legacy conservés pour compatibilité — redirigent sur discord() pour bénéficier du nouveau flow
+alias discord_force='discord'
+alias discord_minimal='discord'
+
+# Helper de nettoyage (utile pour repartir d'un état propre après un bootstrap interrompu).
+# NB : ~/.config/discord/ (cookies, sessions) n'est PAS touché — pour le purger explicitement,
+# utiliser : rm -rf ~/.config/discord
+discord_reset() {
+    local _ws="${STUDENT_WORKSPACE:?}"
+    echo "🧹 Suppression de $_ws/discord-app et $_ws/discord-tarball (binaire + tarball)..."
+    rm -rf "$_ws/discord-app" "$_ws/discord-tarball"
+    # Compatibilité v2 : nettoyage ancien dossier $_ws/discord/ s'il existe (legacy)
+    [[ -d "$_ws/discord" ]] && { rm -rf "$_ws/discord"; echo "🧹 Ancien dossier $_ws/discord supprimé (legacy v2)"; }
+    echo "✅ Binaire Discord réinitialisé. Cookies ~/.config/discord/ préservés."
+    echo "💡 Lancez 'discord' pour réinstaller."
 }
 
 # Installation automatique de Node.js et npm dans l'espace utilisateur
