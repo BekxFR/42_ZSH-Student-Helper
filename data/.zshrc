@@ -292,9 +292,21 @@ export POETRY_HOME="$STUDENT_WORKSPACE/.poetry"
 export CONDA_PKGS_DIRS="$STUDENT_WORKSPACE/.conda/pkgs"
 export CONDA_ENVS_PATH="$STUDENT_WORKSPACE/.conda/envs"
 
+# Variables de contrôle anticipées (defaults positionnés AVANT les appels de _ensure_*_symlinks
+# pour que la réparation des symlinks périmés s'exécute réellement au démarrage du shell —
+# sinon la valeur vide fait retourner les fonctions sans rien faire, et les symlinks issus
+# d'une session précédente sur un autre poste ne sont jamais réparés).
+export STUDENT_USE_PORTABLE_CLAUDE=${STUDENT_USE_PORTABLE_CLAUDE:-0}
+export STUDENT_USE_PORTABLE_CACHE=${STUDENT_USE_PORTABLE_CACHE:-1}
+
 # Claude Code (binaires, cache et marketplaces de plugins redirigés via symlinks vers $STUDENT_WORKSPACE).
 # La fonction _ensure_claude_symlinks répare aussi les symlinks pointant vers un ancien workspace
 # (cas typique : utilisateur ayant initialement utilisé /tmp puis basculé sur /goinfre via détection).
+#
+# Garde anti-self-loop : sur les postes 42, $HOME/.cache est lui-même un symlink vers
+# /goinfre/$USER/.cache. Créer naïvement $HOME/.cache/claude → $STUDENT_WORKSPACE/.cache/claude
+# revient à créer /goinfre/$USER/.cache/claude → /goinfre/$USER/.cache/claude (le lien pointe sur
+# lui-même → ELOOP au prochain accès). On détecte ce cas via realpath des parents.
 _ensure_claude_symlinks() {
     [[ "$STUDENT_USE_PORTABLE_CLAUDE" == "1" ]] || return 0
     local _claude_data="$STUDENT_WORKSPACE/.local/share/claude"
@@ -302,7 +314,7 @@ _ensure_claude_symlinks() {
     local _claude_marketplaces="$STUDENT_WORKSPACE/claude-marketplaces"
     mkdir -p "$_claude_data" "$_claude_cache" "$_claude_marketplaces" 2>/dev/null
 
-    local _link _target _current _parent
+    local _link _target _current _parent _parent_real _target_parent_real
     # Triplets (cible attendue, chemin du symlink, parent à créer)
     local _pairs=(
         "$_claude_data|$HOME/.local/share/claude|$HOME/.local/share"
@@ -314,12 +326,28 @@ _ensure_claude_symlinks() {
         _target="${_entry%%|*}"
         _link="${_entry#*|}"; _link="${_link%%|*}"
         _parent="${_entry##*|}"
+
+        # S'assurer du parent en premier (mkdir idempotent), puis comparer les chemins canoniques.
+        mkdir -p "$_parent" 2>/dev/null
+        _parent_real="$(cd "$_parent" 2>/dev/null && pwd -P)"
+        _target_parent_real="$(cd "$(dirname "$_target")" 2>/dev/null && pwd -P)"
+        # Anti-self-loop : si le parent du lien et le parent de la cible résolvent au même dossier
+        # physique, le lien à créer pointerait sur lui-même. On garantit juste l'existence de la
+        # cible — le lien est déjà "résolu" via le symlink du parent ($HOME/.cache → /goinfre/.cache).
+        if [[ -n "$_parent_real" && "$_parent_real" == "$_target_parent_real" ]]; then
+            # Nettoyer un éventuel self-loop résiduel sous le parent réel (corruption antérieure).
+            if [[ -L "$_target" ]] && [[ "$(readlink "$_target" 2>/dev/null)" == "$_target" ]]; then
+                rm -f "$_target" 2>/dev/null
+                mkdir -p "$_target" 2>/dev/null
+            fi
+            continue
+        fi
+
         _current=""
         [[ -L "$_link" ]] && _current="$(readlink "$_link" 2>/dev/null)"
         # Réparer si : lien absent, cassé, ou pointant vers une cible obsolète (ancien workspace).
         if [[ "$_current" != "$_target" ]] || [[ ! -d "$_link/" ]]; then
             rm -rf "$_link" 2>/dev/null
-            mkdir -p "$_parent" 2>/dev/null
             ln -sfn "$_target" "$_link"
         fi
     done
@@ -453,7 +481,7 @@ alias vagrant_off='export STUDENT_USE_PORTABLE_VAGRANT=0 && unset VAGRANT_HOME &
 alias vagrant_status='echo "📦 Vagrant portable : ${STUDENT_USE_PORTABLE_VAGRANT:-0} $([ "${STUDENT_USE_PORTABLE_VAGRANT:-0}" = "1" ] && echo "✅ VAGRANT_HOME=$VAGRANT_HOME" || echo "❌ (défaut: ~/.vagrant.d)")"'
 
 # Contrôle Claude Code portable
-alias claude_on='export STUDENT_USE_PORTABLE_CLAUDE=1 && mkdir -p "$STUDENT_WORKSPACE/.local/share/claude" "$STUDENT_WORKSPACE/.cache/claude" "$STUDENT_WORKSPACE/claude-marketplaces" && [[ ! -L "$HOME/.local/share/claude" ]] && { rm -rf "$HOME/.local/share/claude" 2>/dev/null; ln -sf "$STUDENT_WORKSPACE/.local/share/claude" "$HOME/.local/share/claude"; }; [[ ! -L "$HOME/.cache/claude" ]] && { rm -rf "$HOME/.cache/claude" 2>/dev/null; ln -sf "$STUDENT_WORKSPACE/.cache/claude" "$HOME/.cache/claude"; }; [[ ! -L "$HOME/.claude/plugins/marketplaces" ]] && { rm -rf "$HOME/.claude/plugins/marketplaces" 2>/dev/null; mkdir -p "$HOME/.claude/plugins" 2>/dev/null; ln -sf "$STUDENT_WORKSPACE/claude-marketplaces" "$HOME/.claude/plugins/marketplaces"; }; export PATH="$HOME/.local/bin:$PATH"; echo "🤖 Claude Code portable activé (données dans $STUDENT_WORKSPACE)"'
+alias claude_on='export STUDENT_USE_PORTABLE_CLAUDE=1 && _ensure_claude_symlinks && export PATH="$HOME/.local/bin:$PATH" && echo "🤖 Claude Code portable activé (données dans $STUDENT_WORKSPACE)"'
 alias claude_off='export STUDENT_USE_PORTABLE_CLAUDE=0 && echo "🤖 Claude Code portable désactivé (redémarrez le terminal pour annuler les symlinks)"'
 alias claude_status='echo "🤖 Claude portable  : ${STUDENT_USE_PORTABLE_CLAUDE:-0} $([ "${STUDENT_USE_PORTABLE_CLAUDE:-0}" = "1" ] && echo "✅ données=$STUDENT_WORKSPACE" || echo "❌ (défaut: ~/.local/share/claude)")"'
 
@@ -1528,28 +1556,14 @@ EOF
 ClaudeInstall() {
     echo "🤖 Installation de Claude Code..."
 
-    # Activer le mode portable si pas déjà fait
+    # Activer le mode portable et (re)câbler les symlinks via la fonction centrale.
+    # _ensure_claude_symlinks contient la garde anti-self-loop nécessaire quand $HOME/.cache
+    # est lui-même un symlink vers $STUDENT_WORKSPACE/.cache (cas standard postes 42).
     if [[ "${STUDENT_USE_PORTABLE_CLAUDE:-0}" != "1" ]]; then
         echo "📂 Activation du mode portable Claude (données dans $STUDENT_WORKSPACE)..."
         export STUDENT_USE_PORTABLE_CLAUDE=1
-        mkdir -p "$STUDENT_WORKSPACE/.local/share/claude" "$STUDENT_WORKSPACE/.cache/claude" "$STUDENT_WORKSPACE/claude-marketplaces" 2>/dev/null
-        [[ ! -L "$HOME/.local/share/claude" ]] && {
-            rm -rf "$HOME/.local/share/claude" 2>/dev/null
-            mkdir -p "$HOME/.local/share" 2>/dev/null
-            ln -sf "$STUDENT_WORKSPACE/.local/share/claude" "$HOME/.local/share/claude"
-        }
-        [[ ! -L "$HOME/.cache/claude" ]] && {
-            rm -rf "$HOME/.cache/claude" 2>/dev/null
-            mkdir -p "$HOME/.cache" 2>/dev/null
-            ln -sf "$STUDENT_WORKSPACE/.cache/claude" "$HOME/.cache/claude"
-        }
-        # Prérequis pour /plugin install : dossier marketplaces redirigé vers /tmp
-        [[ ! -L "$HOME/.claude/plugins/marketplaces" ]] && {
-            rm -rf "$HOME/.claude/plugins/marketplaces" 2>/dev/null
-            mkdir -p "$HOME/.claude/plugins" 2>/dev/null
-            ln -sf "$STUDENT_WORKSPACE/claude-marketplaces" "$HOME/.claude/plugins/marketplaces"
-        }
     fi
+    _ensure_claude_symlinks
 
     # Installer via le script officiel
     if curl -fsSL https://claude.ai/install.sh | bash; then
@@ -1756,8 +1770,8 @@ export STUDENT_USE_PORTABLE_DOCKER=${STUDENT_USE_PORTABLE_DOCKER:-0}
 export STUDENT_USE_PORTABLE_VAGRANT=${STUDENT_USE_PORTABLE_VAGRANT:-0}
 export STUDENT_USE_PORTABLE_VSCODE=${STUDENT_USE_PORTABLE_VSCODE:-0}
 export STUDENT_USE_PORTABLE_IDEA=${STUDENT_USE_PORTABLE_IDEA:-0}
-export STUDENT_USE_PORTABLE_CLAUDE=${STUDENT_USE_PORTABLE_CLAUDE:-0}
-export STUDENT_USE_PORTABLE_CACHE=${STUDENT_USE_PORTABLE_CACHE:-1}
+# Note: STUDENT_USE_PORTABLE_CLAUDE et _CACHE sont définis plus haut (avant les fonctions
+# _ensure_*_symlinks) pour que la réparation des symlinks périmés ait lieu au shell startup.
 export STUDENT_USE_PORTABLE_XDG=${STUDENT_USE_PORTABLE_XDG:-0}
 
 # Fonction de diagnostic rapide
